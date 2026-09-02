@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Matchday · 2026 Fantasy Fixtures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#080c18; --bg2:#0b1224; --surface:#111a30; --surface-2:#16213d;
+    --line:#233152; --line-soft:#1a2540;
+    --ink:#eaf0ff; --ink-dim:#9aa6c4; --ink-faint:#6b7799;
+    --owen:#38d6e6; --nate:#9a7cff;
+    --win:#41d693; --loss:#e0526a; --gold:#f6c945;
+    --radius:14px; --mono-num:"Space Grotesk",system-ui;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 78% -10%, #142046 0%, transparent 55%),
+      radial-gradient(900px 500px at 0% 0%, #10203f 0%, transparent 50%),
+      linear-gradient(180deg,var(--bg2),var(--bg));
+    background-attachment:fixed; color:var(--ink);
+    font-family:"Inter",system-ui,-apple-system,sans-serif;
+    font-feature-settings:"tnum" 1; line-height:1.5; min-height:100vh;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 18px}
+
+  .masthead{padding:34px 0 18px}
+  .topline{height:3px;width:100%;background:linear-gradient(90deg,var(--owen),var(--nate));border-radius:3px;opacity:.9}
+  .kicker{margin:22px 0 6px;font-size:12.5px;letter-spacing:.14em;color:var(--ink-faint);font-weight:600}
+  h1.title{font-family:"Space Grotesk";font-weight:700;font-size:clamp(30px,7vw,52px);line-height:1.02;margin:0;letter-spacing:-.015em}
+  .subtitle{margin:12px 0 0;color:var(--ink-dim);font-size:15px;max-width:64ch}
+  .live-chip{display:inline-flex;align-items:center;gap:8px;margin-top:16px;background:var(--surface);border:1px solid var(--line);padding:7px 13px;border-radius:999px;font-size:13px;color:var(--ink-dim)}
+  .dot-live{width:8px;height:8px;border-radius:50%;background:var(--ink-faint)}
+  .dot-live.on{background:var(--win);animation:pulse 1.8s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(65,214,147,.45)}70%{box-shadow:0 0 0 8px rgba(65,214,147,0)}100%{box-shadow:0 0 0 0 rgba(65,214,147,0)}}
+
+  nav.tabs{position:sticky;top:0;z-index:20;margin-top:22px;background:rgba(9,13,26,.82);backdrop-filter:blur(10px);border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+  nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto}
+  .tab{appearance:none;background:none;border:none;cursor:pointer;color:var(--ink-faint);font-family:inherit;font-size:14px;font-weight:600;padding:15px 14px 13px;border-bottom:2px solid transparent;white-space:nowrap}
+  .tab:hover{color:var(--ink-dim)}
+  .tab.active{color:var(--ink);border-bottom-color:var(--ink)}
+
+  main{padding:26px 0 70px}
+  .view{display:none;animation:fade .28s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .weekbar{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+  .weekstrip{display:flex;gap:6px;overflow-x:auto;padding:2px;scrollbar-width:thin}
+  .wk{flex:0 0 auto;min-width:52px;text-align:center;cursor:pointer;background:var(--surface);border:1px solid var(--line-soft);border-radius:10px;padding:8px 6px;color:var(--ink-dim);font-size:12px;font-weight:600}
+  .wk small{display:block;font-size:10px;color:var(--ink-faint);font-weight:600;margin-top:1px}
+  .wk:hover{border-color:var(--line)}
+  .wk.active{background:var(--surface-2);border-color:var(--ink-dim);color:var(--ink)}
+  .wk.done{opacity:.72}
+  .wk.rival{border-left:2px solid var(--gold)}
+
+  .weekhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:4px 2px 16px}
+  .weekhead h2{font-family:"Space Grotesk";font-weight:600;font-size:22px;margin:0;letter-spacing:-.01em}
+  .weekhead .note{color:var(--ink-dim);font-size:13px}
+  .rivalnote{color:var(--gold)}
+
+  .board{display:grid;gap:12px}
+  .match{background:linear-gradient(180deg,var(--surface),var(--surface-2));border:1px solid var(--line-soft);border-radius:var(--radius);overflow:hidden}
+  .match .badge-row{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--line-soft);font-size:11.5px;color:var(--ink-faint);font-weight:600}
+  .gtype .pill{padding:2px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink-dim)}
+  .gtype .pill.rival{border-color:var(--gold);color:var(--gold)}
+  .status.final{color:var(--ink-dim)}
+  .status.live{color:var(--win)}
+  .status.sched{color:var(--ink-faint)}
+  .status.live::before{content:"● ";font-size:9px;vertical-align:middle}
+
+  .team-row{display:flex;align-items:center;gap:12px;padding:12px 16px;position:relative}
+  .team-row + .team-row{border-top:1px solid var(--line-soft)}
+  .tdot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .tdot.owen{background:var(--owen)} .tdot.nate{background:var(--nate)}
+  .tname{flex:1;min-width:0;font-weight:600;font-size:15px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tseed{color:var(--ink-faint);font-weight:600;font-size:12px}
+  .tright{display:flex;flex-direction:column;align-items:flex-end;min-width:78px}
+  .tscore{font-family:var(--mono-num);font-weight:600;font-size:21px;color:var(--ink-dim);font-variant-numeric:tabular-nums;line-height:1.1}
+  .subline{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:11.5px;color:var(--ink-faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .subline .wp{font-weight:600;color:var(--ink-dim)}
+  .subline .wp.fav{color:var(--ink)}
+  .team-row.winner .tname{color:#fff}
+  .team-row.winner .tscore{color:var(--win)}
+  .team-row.winner::before{content:"";position:absolute;left:0;width:3px;height:44px;background:var(--win);border-radius:0 3px 3px 0}
+  .team-row.loser .tname,.team-row.loser .tscore{color:var(--ink-faint)}
+  .team-row.fav .tscore{color:var(--ink)}
+
+  .divblock{margin-bottom:26px}
+  .divhead{display:flex;align-items:center;gap:10px;margin:0 2px 12px}
+  .divhead h3{font-family:"Space Grotesk";font-size:19px;margin:0;font-weight:600;letter-spacing:-.01em}
+  .divhead .swatch{width:11px;height:11px;border-radius:3px}
+  .divhead.owen .swatch{background:var(--owen)} .divhead.nate .swatch{background:var(--nate)}
+  .table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius);overflow:hidden}
+  .table th,.table td{padding:11px 12px;text-align:right;font-size:13.5px}
+  .table th{color:var(--ink-faint);font-weight:600;font-size:11.5px;letter-spacing:.03em;background:var(--surface-2)}
+  .table th:first-child,.table td:first-child{text-align:center;width:34px}
+  .table th.team,.table td.team{text-align:left}
+  .table td{border-top:1px solid var(--line-soft);color:var(--ink-dim)}
+  .table td.team{color:var(--ink);font-weight:600}
+  .table td.num{font-family:var(--mono-num);font-variant-numeric:tabular-nums;color:var(--ink)}
+  .rk{font-family:var(--mono-num);color:var(--ink-faint);font-weight:600}
+  .marker{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:7px;vertical-align:middle}
+  .m-bye{background:var(--gold)} .m-play{background:var(--win)}
+  .streak-w{color:var(--win)} .streak-l{color:var(--loss)}
+  .divleg{font-size:12px;color:var(--ink-faint);margin:8px 2px 0;display:flex;gap:16px;flex-wrap:wrap}
+  .divleg span{display:inline-flex;align-items:center;gap:6px}
+
+  .odds-bar{position:relative;height:6px;border-radius:3px;background:var(--line-soft);overflow:hidden;min-width:70px}
+  .odds-bar > i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:linear-gradient(90deg,var(--owen),var(--win))}
+  td.oddscell{min-width:96px}
+  .oddswrap{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+  .oddspct{font-family:var(--mono-num);font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink);min-width:44px;text-align:right}
+
+  .panel{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius);padding:20px 20px 6px;margin-bottom:16px}
+  .panel.tight{padding-bottom:20px}
+  .panel h3{font-family:"Space Grotesk";font-size:18px;margin:0 0 4px;font-weight:600}
+  .panel p{color:var(--ink-dim);font-size:14px;margin:6px 0 16px}
+  .seedlist{list-style:none;margin:0 0 14px;padding:0}
+  .seedrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line-soft)}
+  .seedrow:first-child{border-top:none}
+  .seedno{font-family:var(--mono-num);font-weight:700;font-size:16px;width:26px;color:var(--ink-faint)}
+  .seedname{flex:1;font-weight:600;font-size:15px}
+  .seedtag{font-size:12px;color:var(--ink-faint);font-weight:600}
+  .seedtag.bye{color:var(--gold)} .seedtag.champ{color:var(--owen)} .seedtag.play{color:var(--win)}
+  .rule{border-top:1px solid var(--line-soft);padding:16px 0}
+  .rule:first-of-type{border-top:none}
+  .rule b{font-family:"Space Grotesk";font-weight:600;font-size:15px;color:var(--ink)}
+  .rule p{margin:6px 0 0;color:var(--ink-dim);font-size:14px}
+
+  .banner{background:var(--surface);border:1px solid var(--loss);border-radius:12px;padding:14px 16px;color:var(--ink-dim);font-size:13.5px;margin-bottom:18px}
+  .banner.info{border-color:var(--line)}
+  .banner b{color:var(--ink)}
+  .muted{color:var(--ink-faint)}
+
+  footer{border-top:1px solid var(--line-soft);padding:22px 0 40px;color:var(--ink-faint);font-size:12.5px}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+  .refresh{appearance:none;background:var(--surface);border:1px solid var(--line);color:var(--ink-dim);font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 13px;border-radius:9px;cursor:pointer}
+  .refresh:hover{border-color:var(--ink-dim);color:var(--ink)}
+  .skel{color:var(--ink-faint);padding:30px 4px;font-size:14px}
+  @media (max-width:560px){
+    .tscore{font-size:19px} .tright{min-width:70px}
+    .table th,.table td{padding:10px 8px;font-size:12.5px}
+    .table th.hidesm,.table td.hidesm{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap">
+      <div class="topline"></div>
+      <div class="kicker">Fantasy football · 2026 season</div>
+      <h1 class="title" id="leagueName">Matchday</h1>
+      <p class="subtitle">Custom divisional fixtures built from the 2026 league rules — live scores, best-lineup projections and win odds from Sleeper.</p>
+      <span class="live-chip"><span class="dot-live" id="liveDot"></span><span id="liveText">Connecting to Sleeper…</span></span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <div class="wrap">
+      <button class="tab active" data-view="fixtures">Fixtures</button>
+      <button class="tab" data-view="standings">Standings</button>
+      <button class="tab" data-view="playoffs">Playoffs</button>
+      <button class="tab" data-view="rules">Rules</button>
+    </div>
+  </nav>
+
+  <main>
+    <div class="wrap">
+      <div id="errorBanner"></div>
+
+      <section class="view active" id="view-fixtures">
+        <div class="weekbar"><div class="weekstrip" id="weekstrip"></div></div>
+        <div class="weekhead"><h2 id="weekTitle">Week 1</h2><div class="note" id="weekNote"></div></div>
+        <div class="board" id="board"><div class="skel">Loading fixtures…</div></div>
+        <p class="muted" style="font-size:12px;margin:14px 2px 0" id="projFoot"></p>
+      </section>
+
+      <section class="view" id="view-standings">
+        <div id="standings"><div class="skel">Loading standings…</div></div>
+        <div class="divleg">
+          <span><span class="marker m-bye"></span> Division leader (first-round bye)</span>
+          <span><span class="marker m-play"></span> In the playoff picture</span>
+        </div>
+      </section>
+
+      <section class="view" id="view-playoffs">
+        <div class="panel">
+          <h3>Playoff odds</h3>
+          <p>Fair fractional odds for all ten teams, from a season simulation with every remaining week projected individually off best-lineup totals. Short prices are favourites; the bye column is finishing top of a division. Tap a price to see the implied chance.</p>
+          <table class="table" id="oddsTable"><tbody><tr><td class="skel">Simulating the rest of the season…</td></tr></tbody></table>
+        </div>
+        <div class="panel">
+          <h3>If the season ended today</h3>
+          <ol class="seedlist" id="seedlist"><li class="skel">Working it out…</li></ol>
+          <p class="muted" id="champNote"></p>
+        </div>
+        <div class="panel tight">
+          <h3>Best of the rest</h3>
+          <p style="margin-bottom:6px">No more toilet bowl. Sixth place is decided by a best-of-the-rest bracket, and the winner takes home “2.11”.</p>
+        </div>
+      </section>
+
+      <section class="view" id="view-rules">
+        <div class="panel tight">
+          <h3>How the season is built</h3>
+          <p>Two divisions of five. You play each division rival twice and everyone in the other division once — then one extra game against the team that finished in your spot in the other division last year. That’s 14 games. This year the rivalry rematch lands in Week 14.</p>
+          <div class="rule"><b>1 · Champ picks their opponent</b><p>From 2026, the regular-season champion chooses who they face in the semi-final.</p></div>
+          <div class="rule"><b>2 · Divisions</b><p>Two divisions of five. Play divisional members twice, the opposite division once, plus a rematch with your same-placed rival from last year. Playoffs stay at five teams: each division’s top seed gets a bye; the two second seeds and the Most PF wildcard enter the all-play.</p></div>
+          <div class="rule"><b>3 · Draft order by Max PF</b><p>From 2026, next year’s draft order is set by Max PF for every team except the two finalists.</p></div>
+          <div class="rule"><b>4 · Best of the rest</b><p>The toilet bowl is gone. A best-of-the-rest bracket decides 6th place and awards “2.11”.</p></div>
+        </div>
+        <div class="panel tight">
+          <h3>Divisions &amp; last year’s finish</h3>
+          <p>Division seeding uses last season’s final standings as a proxy, split into the two divisions.</p>
+          <div id="divRosters"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>Live scores &amp; projections from the Sleeper API · view only · <span id="updated" class="muted">not yet updated</span></span>
+      <button class="refresh" id="refreshBtn">Refresh</button>
+    </div>
+  </footer>
+
+<script>
+"use strict";
+
+/* ===== PERMANENT CONFIG — this league only ===== */
+const LEAGUE_ID = "1311997710454226944";
+const REG_WEEKS = 14;
+const SIGMA = 26;      // weekly per-team scoring st.dev used for win odds + sims
+const N_SIMS = 4000;   // Monte-Carlo runs for playoff odds
+
+const TEAMS = {
+  O1:{name:"Twitter Eggs and C.J. Ham", div:"Owen", ly:1, overall:1},
+  O2:{name:"Mel Kiper's Burner",        div:"Owen", ly:2, overall:5},
+  O3:{name:"Button's Boys to Men?",     div:"Owen", ly:3, overall:7},
+  O4:{name:"OG (Owen) Nate",            div:"Owen", ly:4, overall:8},
+  O5:{name:"Love Shack",                div:"Owen", ly:5, overall:10},
+  N1:{name:"All Aboard the Gus Bus",    div:"Nate", ly:1, overall:2},
+  N2:{name:"Dust Cap Merriment",        div:"Nate", ly:2, overall:3},
+  N3:{name:"Injured Reserves",          div:"Nate", ly:3, overall:4},
+  N4:{name:"Dillon Panthers",           div:"Nate", ly:4, overall:6},
+  N5:{name:"Owen Nate's Bagel Shop",    div:"Nate", ly:5, overall:9},
+};
+const DIV_META = { Owen:{cls:"owen"}, Nate:{cls:"nate"} };
+
+const SCHEDULE = [
+  [["N3","O3"],["N5","O5"],["O2","O4"],["N4","O1"],["N1","N2"]],
+  [["O1","O3"],["N1","N3"],["N2","N5"],["O2","O5"],["N4","O4"]],
+  [["N1","O3"],["N4","O5"],["N5","O4"],["N2","O1"],["N3","O2"]],
+  [["N3","O4"],["O1","O5"],["N5","O3"],["N2","O2"],["N1","N4"]],
+  [["N5","O2"],["O4","O5"],["N4","O3"],["N1","O1"],["N2","N3"]],
+  [["O2","O3"],["N2","O4"],["N4","N5"],["N1","N3"],["O1","O5"]],
+  [["N3","O1"],["N1","N5"],["N2","O3"],["O4","O5"],["N4","O2"]],
+  [["N5","O1"],["N1","N4"],["O2","O5"],["N2","N3"],["O3","O4"]],
+  [["O3","O4"],["N4","N5"],["O1","O2"],["N1","N2"],["N3","O5"]],
+  [["N1","O2"],["O3","O5"],["N3","N4"],["O1","O4"],["N2","N5"]],
+  [["O2","O4"],["N1","N5"],["O1","O3"],["N3","N4"],["N2","O5"]],
+  [["N3","N5"],["O3","O5"],["O1","O2"],["N2","N4"],["N1","O4"]],
+  [["O2","O3"],["N1","O5"],["N3","N5"],["O1","O4"],["N2","N4"]],
+  [["N1","O1"],["N2","O2"],["N3","O3"],["N4","O4"],["N5","O5"]]
+];
+
+/* Starting-slot eligibility */
+const SLOT_ELIG = {
+  QB:["QB"],RB:["RB"],WR:["WR"],TE:["TE"],K:["K"],DEF:["DEF"],DST:["DEF"],
+  FLEX:["RB","WR","TE"],WRRB_FLEX:["RB","WR"],WRRB_WRT:["RB","WR","TE"],
+  REC_FLEX:["WR","TE"],SUPER_FLEX:["QB","RB","WR","TE"],
+  DL:["DL"],LB:["LB"],DB:["DB"],IDP_FLEX:["DL","LB","DB"]
+};
+const BENCH = new Set(["BN","IR","TAXI"]);
+
+const API_APP = "https://api.sleeper.app/v1";
+const API_COM = "https://api.sleeper.com";
+
+const state = {
+  currentWeek:1, seasonType:"pre", season:"2026",
+  rosterByKey:{}, keyByRoster:{}, rosterPlayers:{},
+  weekPoints:{}, projByWeek:{}, playersPos:{}, weekMean:{}, teamBaseline:{},
+  startSlots:[], scoreKey:"pts_ppr", oddsReady:false,
+  unresolved:[], projFailed:false, league:null, ready:false
+};
+
+/* ---------- helpers ---------- */
+function norm(s){return (s||"").toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim();}
+function tokens(s){return new Set(norm(s).split(" ").filter(Boolean));}
+function jaccard(a,b){const A=tokens(a),B=tokens(b);if(!A.size||!B.size)return 0;let i=0;A.forEach(x=>{if(B.has(x))i++;});return i/(A.size+B.size-i);}
+function fmt(n){return (n==null)?"—":(Math.round(n*100)/100).toFixed(2);}
+function pctTxt(p){return p==null?"—":Math.round(p*100)+"%";}
+function ord(n){const s=["th","st","nd","rd"],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+function erf(x){const s=x<0?-1:1;x=Math.abs(x);const t=1/(1+0.3275911*x);const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);return s*y;}
+function normCdf(z){return 0.5*(1+erf(z/Math.SQRT2));}
+function winProb(a,b){if(a==null||b==null)return null;return normCdf((a-b)/(Math.SQRT2*SIGMA));}
+function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+/* traditional UK fractional-odds ladder (profit/stake) */
+const FRAC_LADDER=[[1,100],[1,66],[1,50],[1,40],[1,33],[1,25],[1,20],[1,16],[1,14],[1,12],[1,10],[1,9],[1,8],[1,7],[1,6],[1,5],[2,9],[1,4],[2,7],[3,10],[1,3],[4,11],[2,5],[4,9],[1,2],[8,15],[4,7],[8,13],[4,6],[8,11],[4,5],[5,6],[10,11],[1,1],[11,10],[6,5],[5,4],[11,8],[6,4],[8,5],[7,4],[15,8],[2,1],[9,4],[5,2],[11,4],[3,1],[10,3],[7,2],[4,1],[9,2],[5,1],[11,2],[6,1],[13,2],[7,1],[15,2],[8,1],[9,1],[10,1],[11,1],[12,1],[14,1],[16,1],[20,1],[25,1],[33,1],[40,1],[50,1],[66,1],[80,1],[100,1]];
+/* probability -> nearest traditional fractional price */
+function toFractional(p){
+  if(p==null) return "—";
+  const pc=Math.min(0.9925,Math.max(0.0075,p));
+  const r=(1-pc)/pc;                          // fair profit/stake ratio
+  let best=FRAC_LADDER[0],bd=Infinity;
+  for(const [n,d] of FRAC_LADDER){const dist=Math.abs(Math.log(n/d)-Math.log(r));if(dist<bd){bd=dist;best=[n,d];}}
+  const [n,d]=best;
+  if(n===1&&d===1) return "Evens";
+  return n+"/"+d;
+}
+async function getJSON(url){const r=await fetch(url,{cache:"no-store"});if(!r.ok)throw new Error(url+" -> "+r.status);return r.json();}
+
+/* ---------- core league load ---------- */
+async function loadCore(){
+  try{
+    const st=await getJSON(API_APP+"/state/nfl");
+    state.season=String(st.season||"2026");
+    state.seasonType=st.season_type||"regular";
+    let wk=Number(st.week||1); if(state.seasonType==="pre")wk=1;
+    state.currentWeek=Math.max(1,wk);
+  }catch(e){}
+
+  const [league,users,rosters]=await Promise.all([
+    getJSON(`${API_APP}/league/${LEAGUE_ID}`),
+    getJSON(`${API_APP}/league/${LEAGUE_ID}/users`),
+    getJSON(`${API_APP}/league/${LEAGUE_ID}/rosters`)
+  ]);
+  state.league=league;
+  if(league&&league.name)document.getElementById("leagueName").textContent=league.name;
+
+  const rec=(league&&league.scoring_settings&&typeof league.scoring_settings.rec==="number")?league.scoring_settings.rec:1;
+  state.scoreKey= rec>=1?"pts_ppr":(rec>0?"pts_half_ppr":"pts_std");
+  const rp=(league&&league.roster_positions)||["QB","RB","RB","WR","WR","TE","FLEX","K","DEF"];
+  state.startSlots=rp.filter(p=>!BENCH.has(p)).map(p=>({name:p,elig:new Set(SLOT_ELIG[p]||["RB","WR","TE"])}));
+
+  const userById={};
+  users.forEach(u=>{const tn=(u.metadata&&u.metadata.team_name)?u.metadata.team_name:u.display_name;userById[u.user_id]=tn||u.display_name||("Team "+u.user_id);});
+  const rosterNames=rosters.map(r=>{state.rosterPlayers[r.roster_id]=r.players||[];return {roster_id:r.roster_id,name:userById[r.owner_id]||("Roster "+r.roster_id)};});
+
+  const used=new Set();
+  Object.keys(TEAMS).forEach(key=>{
+    const target=TEAMS[key].name;
+    let hit=rosterNames.find(r=>!used.has(r.roster_id)&&norm(r.name)===norm(target));
+    if(!hit){let best=null,bs=0;rosterNames.forEach(r=>{if(used.has(r.roster_id))return;const s=jaccard(r.name,target);if(s>bs){bs=s;best=r;}});if(best&&bs>=0.34)hit=best;}
+    if(hit){used.add(hit.roster_id);state.rosterByKey[key]=hit.roster_id;state.keyByRoster[hit.roster_id]=key;}
+    else state.unresolved.push(target);
+  });
+
+  const upto=Math.min(state.currentWeek,REG_WEEKS);
+  const weeks=[];for(let w=1;w<=upto;w++)weeks.push(w);
+  const res=await Promise.all(weeks.map(w=>getJSON(`${API_APP}/league/${LEAGUE_ID}/matchups/${w}`).catch(()=>[])));
+  res.forEach((arr,i)=>{const w=weeks[i],map={};(arr||[]).forEach(m=>{map[m.roster_id]=(typeof m.points==="number")?m.points:0;});state.weekPoints[w]=map;});
+  state.ready=true;
+}
+
+/* ---------- projections support ---------- */
+async function loadPlayerPositions(){
+  if(Object.keys(state.playersPos).length) return;
+  const need=new Set();
+  Object.values(state.rosterPlayers).forEach(arr=>arr.forEach(pid=>need.add(String(pid))));
+  const all=await getJSON(API_APP+"/players/nfl");
+  need.forEach(pid=>{
+    const p=all[pid];
+    if(p){state.playersPos[pid]=(p.fantasy_positions&&p.fantasy_positions.length)?p.fantasy_positions:(p.position?[p.position]:[]);}
+    else if(/^[A-Z]{2,3}$/.test(pid)){state.playersPos[pid]=["DEF"];}
+  });
+}
+async function ensureProjWeek(w){
+  if(state.projByWeek[w]) return;
+  const list=await getJSON(`${API_COM}/projections/nfl/${state.season}/${w}?season_type=regular`);
+  const map={};
+  (list||[]).forEach(it=>{
+    const pid=String(it.player_id);
+    const s=it.stats||{};
+    let pts=s[state.scoreKey];
+    if(typeof pts!=="number") pts=(typeof s.pts_half_ppr==="number")?s.pts_half_ppr:(typeof s.pts_ppr==="number"?s.pts_ppr:(typeof s.pts_std==="number"?s.pts_std:0));
+    map[pid]=pts||0;
+    if(!state.playersPos[pid]&&it.player){const fp=it.player.fantasy_positions||(it.player.position?[it.player.position]:[]);if(fp.length)state.playersPos[pid]=fp;}
+  });
+  state.projByWeek[w]=map;
+}
+/* best-lineup projection for a team in a given week */
+function optimalProj(key,week){
+  const rid=state.rosterByKey[key]; if(rid==null)return null;
+  const proj=state.projByWeek[week]; if(!proj)return null;
+  const players=state.rosterPlayers[rid]||[];
+  let pool=players.map(pid=>({pid:String(pid),pos:state.playersPos[String(pid)]||[],pts:proj[String(pid)]||0}))
+                  .filter(p=>p.pos.length).sort((a,b)=>b.pts-a.pts);
+  const used=new Set();let total=0;
+  const ded=state.startSlots.filter(s=>s.elig.size===1);
+  const flex=state.startSlots.filter(s=>s.elig.size>1).sort((a,b)=>a.elig.size-b.elig.size);
+  ded.forEach(s=>{const pos=[...s.elig][0];const pick=pool.find(p=>!used.has(p.pid)&&p.pos.includes(pos));if(pick){used.add(pick.pid);total+=pick.pts;}});
+  flex.forEach(s=>{const pick=pool.find(p=>!used.has(p.pid)&&p.pos.some(x=>s.elig.has(x)));if(pick){used.add(pick.pid);total+=pick.pts;}});
+  return Math.round(total*100)/100;
+}
+
+/* ---------- scoring / status ---------- */
+function scoreFor(key,week){const rid=state.rosterByKey[key];if(rid==null)return null;const wk=state.weekPoints[week];if(!wk||!(rid in wk))return null;return wk[rid];}
+function weekStatus(week){if(week<state.currentWeek)return "final";if(week===state.currentWeek&&state.seasonType==="regular")return "live";return "sched";}
+
+/* ---------- standings ---------- */
+function computeStandings(){
+  const rec={};Object.keys(TEAMS).forEach(k=>rec[k]={key:k,w:0,l:0,t:0,pf:0,pa:0,games:0,streak:0,sdir:0});
+  for(let w=1;w<=REG_WEEKS;w++){if(weekStatus(w)!=="final")continue;
+    SCHEDULE[w-1].forEach(([a,b])=>{const sa=scoreFor(a,w),sb=scoreFor(b,w);if(sa==null||sb==null)return;
+      rec[a].pf+=sa;rec[a].pa+=sb;rec[a].games++;rec[b].pf+=sb;rec[b].pa+=sa;rec[b].games++;
+      let ra,rb;if(sa>sb){rec[a].w++;rec[b].l++;ra=1;rb=-1;}else if(sb>sa){rec[b].w++;rec[a].l++;ra=-1;rb=1;}else{rec[a].t++;rec[b].t++;ra=0;rb=0;}
+      [[a,ra],[b,rb]].forEach(([k,r])=>{if(r===0){rec[k].sdir=0;rec[k].streak=0;}else if(r===rec[k].sdir){rec[k].streak++;}else{rec[k].sdir=r;rec[k].streak=1;}});
+    });}
+  return rec;
+}
+function cmpTeams(x,y){return (y.w-x.w)||(y.pf-x.pf)||(x.l-y.l);}
+function divisionOrder(rec,div){return Object.values(rec).filter(t=>TEAMS[t.key].div===div).sort(cmpTeams);}
+function seasonHasStarted(rec){return Object.values(rec).some(t=>t.games>0);}
+
+/* ---------- Monte-Carlo playoff odds ---------- */
+/* projected mean for a team in a specific week (each week reprojected individually) */
+function meanFor(k,w){
+  const wm=state.weekMean[w];
+  if(wm&&typeof wm[k]==="number"&&wm[k]>0) return wm[k];
+  const bl=state.teamBaseline[k];
+  return (typeof bl==="number"&&bl>0)?bl:110;
+}
+function simulateOdds(){
+  const base={};Object.keys(TEAMS).forEach(k=>base[k]={w:0,pf:0});
+  for(let w=1;w<=REG_WEEKS;w++){if(weekStatus(w)!=="final")continue;
+    SCHEDULE[w-1].forEach(([a,b])=>{const sa=scoreFor(a,w),sb=scoreFor(b,w);if(sa==null||sb==null)return;
+      base[a].pf+=sa;base[b].pf+=sb;if(sa>sb)base[a].w++;else if(sb>sa)base[b].w++;else{base[a].w+=.5;base[b].w+=.5;}});}
+  const remaining=[];for(let w=1;w<=REG_WEEKS;w++){if(weekStatus(w)!=="final")remaining.push(w);}
+  const sims=remaining.length?N_SIMS:1;
+  const play={},bye={};Object.keys(TEAMS).forEach(k=>{play[k]=0;bye[k]=0;});
+  const keys=Object.keys(TEAMS);
+  for(let s=0;s<sims;s++){
+    const W={},PF={};keys.forEach(k=>{W[k]=base[k].w;PF[k]=base[k].pf;});
+    remaining.forEach(w=>{SCHEDULE[w-1].forEach(([a,b])=>{
+      const sa=meanFor(a,w)+SIGMA*gauss(),sb=meanFor(b,w)+SIGMA*gauss();
+      PF[a]+=sa;PF[b]+=sb;if(sa>=sb)W[a]++;else W[b]++;});});
+    const bydiv={Owen:[],Nate:[]};keys.forEach(k=>bydiv[TEAMS[k].div].push(k));
+    const sk=(a,b)=>(W[b]-W[a])||(PF[b]-PF[a]);
+    bydiv.Owen.sort(sk);bydiv.Nate.sort(sk);
+    const winners=[bydiv.Owen[0],bydiv.Nate[0]];
+    const runners=[bydiv.Owen[1],bydiv.Nate[1]];
+    const q=new Set([...winners,...runners]);
+    const wild=keys.filter(k=>!q.has(k)).sort((a,b)=>(PF[b]-PF[a])||(W[b]-W[a]))[0];
+    [...winners,...runners,wild].forEach(k=>play[k]++);
+    winners.forEach(k=>bye[k]++);
+  }
+  const odds={};keys.forEach(k=>{odds[k]={playoff:play[k]/sims,bye:bye[k]/sims};});
+  return odds;
+}
+
+/* ============ RENDERING ============ */
+let activeWeek=1;
+
+function renderWeekStrip(){
+  const el=document.getElementById("weekstrip");el.innerHTML="";
+  for(let w=1;w<=REG_WEEKS;w++){
+    const b=document.createElement("button");const st=weekStatus(w);
+    b.className="wk"+(w===activeWeek?" active":"")+(st==="final"?" done":"")+(w===14?" rival":"");
+    b.innerHTML=`W${w}<small>${w===14?"rivalry":(st==="final"?"final":st==="live"?"live":"·")}</small>`;
+    b.onclick=()=>{activeWeek=w;renderFixtures();ensureWeekProjThenRerender(w);};
+    el.appendChild(b);
+  }
+}
+function gameType(week,a,b){
+  if(week===14)return {label:"Rivalry rematch",cls:"rival"};
+  if(TEAMS[a].div===TEAMS[b].div)return {label:TEAMS[a].div+" division",cls:"div"};
+  return {label:"Cross-division",cls:""};
+}
+function teamRowHTML(key,opts){
+  const t=TEAMS[key];const cls=["team-row"];
+  if(opts.winner===true)cls.push("winner");else if(opts.winner===false)cls.push("loser");
+  if(opts.fav)cls.push("fav");
+  return `<div class="${cls.join(' ')}">
+    <span class="tdot ${DIV_META[t.div].cls}"></span>
+    <span class="tname">${t.name} <span class="tseed">· ${t.div[0]}${t.ly}</span></span>
+    <span class="tright"><span class="tscore">${opts.primary}</span><span class="subline">${opts.sub}</span></span>
+  </div>`;
+}
+function renderFixtures(){
+  renderWeekStrip();
+  document.getElementById("weekTitle").textContent="Week "+activeWeek;
+  const st=weekStatus(activeWeek);
+  document.getElementById("weekNote").innerHTML= activeWeek===14
+    ? '<span class="rivalnote">Rivalry week — last year’s same-placed rivals, one more time</span>'
+    : (st==="live"?"Live scoring":st==="final"?"Final scores":"Upcoming · best-lineup projection");
+  const board=document.getElementById("board");board.innerHTML="";
+  const projReady=!!state.projByWeek[activeWeek]&&Object.keys(state.playersPos).length;
+
+  SCHEDULE[activeWeek-1].forEach(([a,b])=>{
+    const sa=scoreFor(a,activeWeek),sb=scoreFor(b,activeWeek);
+    const hasActual=(st==="final"||st==="live")&&sa!=null&&sb!=null;
+    const pa=projReady?optimalProj(a,activeWeek):null;
+    const pb=projReady?optimalProj(b,activeWeek):null;
+    const wpa=winProb(pa,pb),wpb=(wpa==null?null:1-wpa);
+    const gt=gameType(activeWeek,a,b);
+    const statusTxt=st==="final"?"Final":st==="live"?"Live":"Wk "+activeWeek;
+
+    function side(key,actual,proj,wp,oppProj){
+      if(hasActual){
+        const isWin=actual> (key===a?sb:sa), isLoss=actual< (key===a?sb:sa);
+        const sub= proj!=null
+          ? `proj ${fmt(proj)} · <span class="wp">${pctTxt(wp)}</span>`
+          : `<span class="wp">proj …</span>`;
+        return {primary:fmt(actual), sub, winner:(actual===(key===a?sb:sa))?null:isWin, fav:false};
+      }else{
+        // upcoming: projection is the headline
+        const favored= proj!=null&&oppProj!=null&&proj>oppProj;
+        const sub= proj!=null
+          ? `<span class="wp ${favored?'fav':''}">${pctTxt(wp)} to win</span>`
+          : `<span class="wp">proj …</span>`;
+        return {primary: proj!=null?fmt(proj):"—", sub, winner:null, fav:favored};
+      }
+    }
+    const A=side(a,sa,pa,wpa,pb), B=side(b,sb,pb,wpb,pa);
+    const card=document.createElement("div");card.className="match";
+    card.innerHTML=`
+      <div class="badge-row">
+        <span class="gtype"><span class="pill ${gt.cls}">${gt.label}</span></span>
+        <span class="status ${st}">${statusTxt}</span>
+      </div>
+      ${teamRowHTML(a,A)}
+      ${teamRowHTML(b,B)}`;
+    board.appendChild(card);
+  });
+
+  const foot=document.getElementById("projFoot");
+  if(state.projFailed) foot.textContent="Projection feed unavailable right now — showing live scores only. Win odds return once it’s back.";
+  else if(!projReady && st!=="final") foot.textContent="Loading best-lineup projections…";
+  else foot.textContent="Projections assume each team starts its highest-scoring legal lineup. Win % from projected scores (± "+SIGMA+" pt weekly variance).";
+}
+
+function renderStandings(){
+  const rec=computeStandings();const started=seasonHasStarted(rec);
+  const host=document.getElementById("standings");host.innerHTML="";
+  ["Owen","Nate"].forEach(div=>{
+    const order=divisionOrder(rec,div);
+    const rows=order.map((t,i)=>{
+      const marker=i===0?'<span class="marker m-bye" title="Division leader — bye"></span>':i===1?'<span class="marker m-play" title="In the playoff picture"></span>':"";
+      const streak=t.streak?`<span class="${t.sdir>0?'streak-w':'streak-l'}">${t.sdir>0?'W':'L'}${t.streak}</span>`:"—";
+      return `<tr><td class="rk">${i+1}</td><td class="team">${TEAMS[t.key].name}${marker}</td>
+        <td class="num">${t.w}-${t.l}${t.t?("-"+t.t):""}</td><td class="num">${fmt(t.pf)}</td>
+        <td class="num hidesm">${fmt(t.pa)}</td><td class="hidesm">${streak}</td></tr>`;
+    }).join("");
+    const block=document.createElement("div");block.className="divblock";
+    block.innerHTML=`<div class="divhead ${DIV_META[div].cls}"><span class="swatch"></span><h3>${div} division</h3></div>
+      <table class="table"><thead><tr><th>#</th><th class="team">Team</th><th>Rec</th><th>PF</th><th class="hidesm">PA</th><th class="hidesm">Streak</th></tr></thead><tbody>${rows}</tbody></table>`;
+    host.appendChild(block);
+  });
+  if(!started){const p=document.createElement("p");p.className="muted";p.style.cssText="margin:4px 2px 0;font-size:13px";p.textContent="No games are final yet — records fill in as the season plays out. Order shown is last year’s divisional finish.";host.appendChild(p);}
+}
+
+function renderPlayoffs(){
+  const rec=computeStandings();
+  const owen=divisionOrder(rec,"Owen"),nate=divisionOrder(rec,"Nate");
+  const leaders=[owen[0],nate[0]].sort(cmpTeams);
+  const runners=[owen[1],nate[1]];
+  const q=new Set([owen[0].key,nate[0].key,owen[1].key,nate[1].key]);
+  const wildcard=Object.values(rec).filter(t=>!q.has(t.key)).sort((a,b)=>(b.pf-a.pf)||(b.w-a.w))[0];
+  const allplay=[runners[0],runners[1],wildcard].sort(cmpTeams);
+  const list=document.getElementById("seedlist");list.innerHTML="";
+  [
+    {t:leaders[0],tag:"Bye · picks semi-final opponent",cls:"champ"},
+    {t:leaders[1],tag:"Division leader · bye",cls:"bye"},
+    {t:allplay[0],tag:"All-play",cls:"play"},
+    {t:allplay[1],tag:"All-play",cls:"play"},
+    {t:allplay[2],tag:"All-play · Most PF wildcard",cls:"play"},
+  ].forEach((r,i)=>{const li=document.createElement("li");li.className="seedrow";
+    li.innerHTML=`<span class="seedno">${i+1}</span><span class="seedname">${TEAMS[r.t.key].name} <span class="tseed">(${TEAMS[r.t.key].div})</span></span><span class="seedtag ${r.cls}">${r.tag}</span>`;list.appendChild(li);});
+  document.getElementById("champNote").textContent=seasonHasStarted(rec)?"Seeds from completed weeks. Ties broken by record, then points for.":"Uses last year’s divisional finish until real games are final.";
+
+  // odds table (all 10 teams) — UK fractional prices
+  const tbl=document.getElementById("oddsTable");
+  if(!state.oddsReady && !(state.currentWeek>REG_WEEKS)){
+    tbl.innerHTML=`<tbody><tr><td class="skel">Simulating the rest of the season…</td></tr></tbody>`;return;
+  }
+  const odds=simulateOdds();
+  const rows=Object.keys(TEAMS).map(k=>({k,rec:rec[k],o:odds[k]}))
+    .sort((x,y)=>(y.o.playoff-x.o.playoff)||(y.o.bye-x.o.bye)||(y.rec.pf-x.rec.pf));
+  const body=rows.map(r=>{
+    const pct=Math.round(r.o.playoff*100);
+    const playPrice=toFractional(r.o.playoff), byePrice=toFractional(r.o.bye);
+    return `<tr>
+      <td class="rk">${r.rec.w}-${r.rec.l}</td>
+      <td class="team">${TEAMS[r.k].name} <span class="tseed">· ${TEAMS[r.k].div[0]}</span></td>
+      <td class="oddscell"><div class="oddswrap"><span class="oddspct" title="${pct}% chance">${playPrice}</span><span class="odds-bar"><i style="width:${Math.max(2,pct)}%"></i></span></div></td>
+      <td class="num hidesm" title="${Math.round(r.o.bye*100)}% chance">${byePrice}</td>
+    </tr>`;
+  }).join("");
+  tbl.innerHTML=`<thead><tr><th>Rec</th><th class="team">Team</th><th>To reach playoffs</th><th class="hidesm">Bye</th></tr></thead><tbody>${body}</tbody>`;
+}
+
+function renderDivRosters(){
+  const host=document.getElementById("divRosters");host.innerHTML="";
+  ["Owen","Nate"].forEach(div=>{
+    const teams=Object.keys(TEAMS).filter(k=>TEAMS[k].div===div).sort((a,b)=>TEAMS[a].ly-TEAMS[b].ly);
+    const rows=teams.map(k=>`<tr><td class="rk">${TEAMS[k].ly}</td><td class="team">${TEAMS[k].name}</td><td class="num hidesm">${ord(TEAMS[k].overall)} overall</td></tr>`).join("");
+    const block=document.createElement("div");block.className="divblock";
+    block.innerHTML=`<div class="divhead ${DIV_META[div].cls}"><span class="swatch"></span><h3>${div} division</h3></div>
+      <table class="table"><thead><tr><th>#</th><th class="team">Team</th><th class="hidesm">Last year</th></tr></thead><tbody>${rows}</tbody></table>`;
+    host.appendChild(block);
+  });
+}
+
+/* ---------- status chrome ---------- */
+function setLive(){
+  const dot=document.getElementById("liveDot"),txt=document.getElementById("liveText");
+  if(state.seasonType==="regular"&&state.currentWeek<=REG_WEEKS){dot.classList.add("on");txt.textContent=`Live · Week ${state.currentWeek} of ${REG_WEEKS}`;}
+  else if(state.currentWeek>REG_WEEKS){dot.classList.remove("on");txt.textContent="Regular season complete";}
+  else{dot.classList.remove("on");txt.textContent=`Preseason · ${state.season} · Week 1 kicks off soon`;}
+}
+function showError(){
+  const el=document.getElementById("errorBanner");let html="";
+  if(state.unresolved.length) html+=`<div class="banner">Couldn’t match <b>${state.unresolved.length}</b> team name(s) to Sleeper: <b>${state.unresolved.join(", ")}</b>. Fixtures still show, but these won’t score until the names line up.</div>`;
+  el.innerHTML=html;
+}
+function renderAll(){
+  activeWeek=Math.min(Math.max(activeWeek,1),REG_WEEKS);
+  renderFixtures();renderStandings();renderPlayoffs();renderDivRosters();setLive();showError();
+  document.getElementById("updated").textContent="updated "+new Date().toLocaleString();
+}
+
+/* ---------- projection orchestration ---------- */
+async function ensureWeekProjThenRerender(w){
+  if(state.projFailed||state.projByWeek[w]||!Object.keys(state.playersPos).length) return;
+  try{await ensureProjWeek(w);renderFixtures();}catch(e){}
+}
+async function loadProjections(){
+  try{
+    await loadPlayerPositions();
+    const remaining=[];for(let w=1;w<=REG_WEEKS;w++){if(weekStatus(w)!=="final")remaining.push(w);}
+    // fetch projections for every remaining week, in parallel
+    await Promise.all(remaining.map(w=>ensureProjWeek(w).catch(()=>{})));
+    // reproject each remaining week individually: best-lineup total per team per week
+    state.weekMean={};
+    remaining.forEach(w=>{
+      if(!state.projByWeek[w])return;
+      const m={};Object.keys(TEAMS).forEach(k=>{const v=optimalProj(k,w);if(v!=null)m[k]=v;});
+      state.weekMean[w]=m;
+    });
+    // per-team baseline (average of weeks with data) as a fallback for bye/empty weeks
+    Object.keys(TEAMS).forEach(k=>{
+      const vals=[];Object.keys(state.weekMean).forEach(w=>{const v=state.weekMean[w][k];if(v>0)vals.push(v);});
+      state.teamBaseline[k]=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:110;
+    });
+    state.projFailed = remaining.length>0 && remaining.every(w=>!state.projByWeek[w]);
+  }catch(e){
+    state.projFailed=true;
+  }
+  state.oddsReady=true;
+  renderFixtures();renderPlayoffs();
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  try{
+    await loadCore();
+    activeWeek=Math.min(state.currentWeek,REG_WEEKS);
+    renderAll();
+    loadProjections();               // enhance in the background
+  }catch(e){
+    document.getElementById("errorBanner").innerHTML=`<div class="banner"><b>Couldn’t reach Sleeper.</b> Check the connection and hit refresh. The fixture list below is still correct — only live data needs the API. <span class="muted">(${e.message})</span></div>`;
+    renderFixtures();renderStandings();renderPlayoffs();renderDivRosters();
+    document.getElementById("liveText").textContent="Offline — fixtures only";
+  }
+}
+
+/* tabs + refresh */
+document.querySelectorAll(".tab").forEach(btn=>{btn.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  btn.classList.add("active");document.getElementById("view-"+btn.dataset.view).classList.add("active");
+};});
+document.getElementById("refreshBtn").onclick=async()=>{
+  const b=document.getElementById("refreshBtn");b.textContent="Refreshing…";
+  try{await loadCore();
+    // refresh projections and re-simulate
+    state.projByWeek={};state.weekMean={};state.teamBaseline={};state.oddsReady=false;
+    await loadProjections();
+    renderAll();
+  }catch(e){}
+  b.textContent="Refresh";
+};
+
+boot();
+setInterval(()=>{if(state.ready&&state.seasonType==="regular"&&state.currentWeek<=REG_WEEKS){
+  loadCore().then(()=>{ if(state.projByWeek[state.currentWeek]) delete state.projByWeek[state.currentWeek]; return ensureWeekProjThenRerender(state.currentWeek);}).then(renderAll).catch(()=>{});
+}},90000);
+</script>
+</body>
+</html>
