@@ -180,9 +180,34 @@
   .lu-pts{text-align:right;font-family:var(--mono-num);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
   .lu-table tfoot td{border-top:1px solid var(--line);font-weight:700;color:var(--ink);font-size:13px}
   .lu-table tfoot .lu-player{font-weight:700}
+  .rv-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:2px 2px 14px}
+  .rv-head h2{font-family:"Space Grotesk";font-weight:600;font-size:22px;margin:0;letter-spacing:-.01em}
+  .rv-intro{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius);padding:16px 18px;font-size:15px;color:var(--ink-dim);line-height:1.6;margin:0 0 22px}
+  .rv-intro b{color:var(--ink);font-weight:600}
+  .rv-sec{font-family:"Space Grotesk";font-size:14px;font-weight:600;color:var(--ink-faint);letter-spacing:.02em;margin:24px 2px 12px}
+  .rv-awards{display:grid;gap:10px}
+  .rv-award{background:var(--surface);border:1px solid var(--line-soft);border-left:3px solid var(--owen);border-radius:12px;padding:12px 15px}
+  .rv-award-name{font-family:"Space Grotesk";font-size:12.5px;font-weight:600;color:var(--owen);margin-bottom:4px;letter-spacing:.01em}
+  .rv-award-text{font-size:14px;color:var(--ink-dim);line-height:1.55}
+  .rv-award-text b{color:var(--ink);font-weight:600}
+  .rv-trend{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .rv-tr{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:14px 15px;font-size:14px;color:var(--ink)}
+  .rv-tr.up{border-top:2px solid var(--win)} .rv-tr.down{border-top:2px solid var(--loss)}
+  .rv-tr-h{display:block;font-size:12px;font-weight:600;color:var(--ink-faint);margin-bottom:6px}
+  .rv-tr b{font-weight:600}
+  .rv-trade{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:12px 15px;margin-bottom:10px}
+  .rv-trade-t{font-family:"Space Grotesk";font-size:12px;font-weight:600;color:var(--ink-faint);margin-bottom:8px}
+  .rv-tsides{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .rv-tside-h{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:3px}
+  .grade{font-family:var(--mono-num);font-weight:700;font-size:12px;padding:1px 7px;border-radius:6px}
+  .grade.g-a{background:rgba(65,214,147,.16);color:var(--win)}
+  .grade.g-b{background:rgba(56,214,230,.16);color:var(--owen)}
+  .grade.g-c{background:rgba(246,201,69,.16);color:var(--gold)}
+  .grade.g-d{background:rgba(224,82,106,.16);color:var(--loss)}
   @media (max-width:560px){
     .lu-grid{grid-template-columns:1fr}
     .sl-team b{font-size:13.5px} .sl-score{font-size:21px}
+    .rv-trend,.rv-tsides{grid-template-columns:1fr}
   }
 
     .table th,.table td{padding:10px 8px;font-size:12.5px}
@@ -205,6 +230,7 @@
   <nav class="tabs">
     <div class="wrap">
       <button class="tab active" data-view="fixtures">Fixtures</button>
+      <button class="tab" data-view="review">Review</button>
       <button class="tab" data-view="standings">Standings</button>
       <button class="tab" data-view="playoffs">Playoffs</button>
       <button class="tab" data-view="rules">Rules</button>
@@ -220,6 +246,11 @@
         <div class="weekhead"><h2 id="weekTitle">Week 1</h2><div class="note" id="weekNote"></div></div>
         <div class="board" id="board"><div class="skel">Loading fixtures…</div></div>
         <p class="muted" style="font-size:12px;margin:14px 2px 0" id="projFoot"></p>
+      </section>
+
+      <section class="view" id="view-review">
+        <div class="weekbar"><div class="weekstrip" id="reviewStrip"></div></div>
+        <div id="reviewBody"><div class="skel">Loading the week…</div></div>
       </section>
 
       <section class="view" id="view-standings">
@@ -336,6 +367,7 @@ const state = {
   rosterByKey:{}, keyByRoster:{}, rosterPlayers:{},
   weekPoints:{}, matchRaw:{}, projByWeek:{}, projStatsByWeek:{}, statsByWeek:{}, playersPos:{}, playerInfo:{}, weekMean:{}, teamBaseline:{},
   startSlots:[], scoreKey:"pts_ppr", oddsReady:false, statsFailed:false,
+  transByWeek:{}, namesTried:false,
   unresolved:[], projFailed:false, league:null, ready:false
 };
 
@@ -772,6 +804,168 @@ function renderDivRosters(){
   });
 }
 
+/* ---------- weekly review ---------- */
+let reviewWeek=1;
+function finalWeeks(){const a=[];for(let w=1;w<=REG_WEEKS;w++){if(weekStatus(w)==="final")a.push(w);}return a;}
+function pname(pid){const i=state.playerInfo[String(pid)];return i?i.name:String(pid);}
+function pick(seed,arr){return arr[Math.abs(Math.floor(seed))%arr.length];}
+async function ensureTransWeek(w){
+  if(state.transByWeek[w]!==undefined) return;
+  try{state.transByWeek[w]=(await getJSON(`${API_APP}/league/${LEAGUE_ID}/transactions/${w}`))||[];}
+  catch(e){state.transByWeek[w]=[];}
+}
+/* best lineup a team could have started from ACTUAL points (players_points) */
+function bestActualLineup(rid,week){
+  const m=state.matchRaw[week]&&state.matchRaw[week][rid]; if(!m)return null;
+  const pp=m.players_points||{}; const players=m.players||Object.keys(pp);
+  let pool=players.map(pid=>({pid:String(pid),pos:state.playersPos[String(pid)]||[],pts:(typeof pp[pid]==="number"?pp[pid]:0)})).filter(p=>p.pos.length).sort((a,b)=>b.pts-a.pts);
+  const used=new Set();let total=0;
+  const ded=state.startSlots.filter(s=>s.elig.size===1);
+  const flex=state.startSlots.filter(s=>s.elig.size>1).sort((a,b)=>a.elig.size-b.elig.size);
+  ded.forEach(s=>{const pos=[...s.elig][0];const pk=pool.find(p=>!used.has(p.pid)&&p.pos.includes(pos));if(pk){used.add(pk.pid);total+=pk.pts;}});
+  flex.forEach(s=>{const pk=pool.find(p=>!used.has(p.pid)&&p.pos.some(x=>s.elig.has(x)));if(pk){used.add(pk.pid);total+=pk.pts;}});
+  return {total:Math.round(total*100)/100,optimal:used,pp};
+}
+function playerROS(pid){pid=String(pid);const v=[];Object.keys(state.projByWeek).forEach(w=>{const x=state.projByWeek[w][pid];if(typeof x==="number"&&x>0)v.push(x);});return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;}
+function gradeFromNet(net){if(net>=5)return"A+";if(net>=3.5)return"A";if(net>=2)return"B+";if(net>=1)return"B";if(net>=0.3)return"C+";if(net>-0.3)return"C";if(net>-1)return"C-";if(net>-2)return"D";return"F";}
+function gradeClass(g){const c=g[0];return c==="A"?"g-a":c==="B"?"g-b":c==="C"?"g-c":"g-d";}
+/* records + streaks through a given week */
+function recordsThrough(week){
+  const keys=Object.keys(TEAMS);const rec={};keys.forEach(k=>rec[k]={key:k,w:0,l:0,pf:0,res:[]});
+  for(let x=1;x<=week;x++){if(weekStatus(x)!=="final")continue;
+    SCHEDULE[x-1].forEach(([a,b])=>{const sa=scoreFor(a,x),sb=scoreFor(b,x);if(sa==null||sb==null)return;
+      rec[a].pf+=sa;rec[b].pf+=sb;
+      if(sa>sb){rec[a].w++;rec[b].l++;rec[a].res.push(1);rec[b].res.push(-1);}
+      else if(sb>sa){rec[b].w++;rec[a].l++;rec[b].res.push(1);rec[a].res.push(-1);}
+      else{rec[a].res.push(0);rec[b].res.push(0);}});}
+  keys.forEach(k=>{const r=rec[k].res;let s=0,d=0;for(let i=r.length-1;i>=0;i--){if(r[i]===0)break;if(d===0)d=r[i];if(r[i]===d)s++;else break;}rec[k].streak=s;rec[k].sdir=d;});
+  return rec;
+}
+function buildReview(week){
+  const keys=Object.keys(TEAMS);
+  const scores={};keys.forEach(k=>scores[k]=scoreFor(k,week));
+  const valid=keys.filter(k=>scores[k]!=null);
+  const sorted=valid.slice().sort((a,b)=>scores[b]-scores[a]);
+  const arr=sorted.map(k=>scores[k]).sort((a,b)=>a-b);
+  const median=arr.length?(arr.length%2?arr[(arr.length-1)/2]:(arr[arr.length/2-1]+arr[arr.length/2])/2):0;
+  const high=sorted[0],low=sorted[sorted.length-1];
+  // games from OUR schedule
+  const games=SCHEDULE[week-1].map(([a,b])=>{const sa=scores[a],sb=scores[b];const w=sa>sb?a:b,l=sa>sb?b:a;return{a,b,sa,sb,win:w,lose:l,margin:Math.abs((sa||0)-(sb||0)),combined:(sa||0)+(sb||0)};}).filter(g=>g.sa!=null&&g.sb!=null);
+  const blowout=games.slice().sort((x,y)=>y.margin-x.margin)[0];
+  const nail=games.slice().sort((x,y)=>x.margin-y.margin)[0];
+  const losers=games.map(g=>({key:g.lose,pts:scores[g.lose],by:g.margin}));
+  const badBeat=losers.slice().sort((x,y)=>y.pts-x.pts)[0];
+  // standings + streaks
+  const rec=recordsThrough(week);
+  const seed={};valid.slice().sort((a,b)=>(rec[b].w-rec[a].w)||(rec[b].pf-rec[a].pf)).forEach((k,i)=>seed[k]=i+1);
+  // surprise: biggest seed-gap upset (lower seed beat higher seed)
+  let surprise=null;games.forEach(g=>{const gap=seed[g.lose]-seed[g.win];if(gap>0){const sc=gap*10+g.margin;if(!surprise||sc>surprise.sc)surprise={g,gap,sc};}});
+  // walking L: longest active losing streak
+  const lstreaks=valid.filter(k=>rec[k].sdir<0).sort((a,b)=>rec[b].streak-rec[a].streak);
+  const walkingL=lstreaks[0]||low;
+  const wstreaks=valid.filter(k=>rec[k].sdir>0).sort((a,b)=>rec[b].streak-rec[a].streak);
+  const hotHand=wstreaks[0];
+  // decisions: bench points left
+  const decisions=valid.map(k=>{const rid=state.rosterByKey[k];const bl=bestActualLineup(rid,week);if(!bl)return null;const m=state.matchRaw[week][rid];const left=Math.round((bl.total-(scores[k]||0))*100)/100;
+    // biggest mistake vs should-have
+    const starters=(m.starters||[]).map(String);const pp=bl.pp;
+    const mistakes=starters.filter(p=>!bl.optimal.has(p)).map(p=>({pid:p,pts:pp[p]||0})).sort((x,y)=>x.pts-y.pts);
+    const shoulds=[...bl.optimal].filter(p=>!starters.includes(p)).map(p=>({pid:p,pts:pp[p]||0})).sort((x,y)=>y.pts-x.pts);
+    return{key:k,left,worst:mistakes[0],should:shoulds[0]};}).filter(Boolean);
+  const worstDecision=decisions.slice().sort((a,b)=>b.left-a.left)[0];
+  const perfect=decisions.filter(d=>d.left<0.05).map(d=>d.key);
+  // play of the week: top single starter
+  let play=null;valid.forEach(k=>{const rid=state.rosterByKey[k];const m=state.matchRaw[week][rid];(m.starters||[]).forEach((pid,i)=>{const pts=(m.starters_points||[])[i]||0;if(!play||pts>play.pts)play={pid:String(pid),pts,key:k};});});
+  // trending: momentum from last 3
+  const mom=valid.map(k=>{const r=rec[k].res.slice(-3);const wins=r.filter(x=>x>0).length;const recentPF=(()=>{let s=0,n=0;const res=rec[k].res;return rec[k].pf;})();return{key:k,wins,streak:rec[k].sdir*rec[k].streak,form:r.map(x=>x>0?"W":x<0?"L":"T").join("-")};});
+  const riser=mom.slice().sort((a,b)=>(b.wins-a.wins)||(b.streak-a.streak))[0];
+  const faller=mom.slice().sort((a,b)=>(a.wins-b.wins)||(a.streak-b.streak))[0];
+  // transactions
+  const tx=(state.transByWeek[week]||[]).filter(t=>t.status==="complete");
+  const trades=tx.filter(t=>t.type==="trade").map(t=>{
+    const rids=t.roster_ids||[];
+    const sides=rids.map(rid=>{
+      const got=Object.keys(t.adds||{}).filter(p=>t.adds[p]===rid);
+      const gave=Object.keys(t.drops||{}).filter(p=>t.drops[p]===rid);
+      const picks=(t.draft_picks||[]).filter(dp=>dp.owner_id===rid).map(dp=>`${dp.season} R${dp.round}`);
+      const vin=got.reduce((s,p)=>s+playerROS(p),0),vout=gave.reduce((s,p)=>s+playerROS(p),0);
+      return{rid,key:state.keyByRoster[rid],got,gave,picks,net:vin-vout};});
+    return{sides};
+  });
+  const waivers=tx.filter(t=>t.type==="waiver"&&t.adds).map(t=>{const p=Object.keys(t.adds)[0];const rid=t.adds[p];return{pid:p,key:state.keyByRoster[rid],bid:(t.settings&&t.settings.waiver_bid)||0};}).sort((a,b)=>b.bid-a.bid);
+  // next week matchup of the week
+  let nextGame=null;
+  if(week<REG_WEEKS){const ng=SCHEDULE[week].map(([a,b])=>({a,b,combined:(rec[a].w+rec[b].w),pf:rec[a].pf+rec[b].pf})).sort((x,y)=>(y.combined-x.combined)||(y.pf-x.pf))[0];nextGame=ng;}
+  return{week,scores,sorted,median,high,low,games,blowout,nail,badBeat,surprise,walkingL,hotHand,worstDecision,perfect,play,riser,faller,trades,waivers,nextGame,rec,seed};
+}
+function buildReviewHTML(week){
+  const r=buildReview(week);const S=week*7+3;
+  const tn=k=>TEAMS[k].name;const sc=k=>fmt(r.scores[k]);
+  if(!r.sorted.length) return `<div class="skel">No final scores for Week ${week} yet.</div>`;
+  // intro
+  const vibe=r.median<95?pick(S,["Bloodbath. Genuinely grim scoring across the board.","A low-scoring slog — everyone left their brains on the bench.","Rough week for offense. The league median is embarrassing."]):r.median>120?pick(S,["Shootout city — points everywhere you looked.","Big scoring week, the league came to play."]):pick(S,["Business as usual around the league.","A perfectly cromulent week of fantasy."]);
+  const intro=`${vibe} League median landed at <b>${fmt(r.median)}</b>. <b>${tn(r.high)}</b> topped everyone with <b>${sc(r.high)}</b>${r.hotHand?`, riding a ${r.rec[r.hotHand].streak}-game heater`:""}. Somebody had to finish last, and this week it was <b>${tn(r.low)}</b> at <b>${sc(r.low)}</b>.`;
+  // awards
+  const A=[];
+  A.push({n:"Team of the Week",t:`<b>${tn(r.high)}</b> — ${sc(r.high)}. ${pick(S+1,["Untouchable.","Nobody came close.","Set the pace and never looked back."])}`});
+  A.push({n:"The Walking L",t:`<b>${tn(r.walkingL)}</b> ${r.rec[r.walkingL].sdir<0?`— ${r.rec[r.walkingL].streak} losses and counting. ${pick(S+2,["The spiral continues.","On a one-way trip to 1.01.","Somebody stop the bleeding."])}`:"— someone has to hold the wooden spoon."}`});
+  if(r.badBeat)A.push({n:"Bad Beat of the Week",t:`<b>${tn(r.badBeat.key)}</b> dropped <b>${fmt(r.badBeat.pts)}</b> and still lost by ${fmt(r.badBeat.by)}. ${pick(S+3,["Didn't deserve that.","Robbed in broad daylight.","Right week, wrong opponent."])}`});
+  if(r.blowout)A.push({n:"Blowout of the Week",t:`<b>${tn(r.blowout.win)}</b> ${fmt(r.scores[r.blowout.win])}–${fmt(r.scores[r.blowout.lose])} <b>${tn(r.blowout.lose)}</b>. A ${fmt(r.blowout.margin)}-point woodshed.`});
+  if(r.nail&&r.nail!==r.blowout)A.push({n:"Nail-biter",t:`<b>${tn(r.nail.win)}</b> edged <b>${tn(r.nail.lose)}</b> by just ${fmt(r.nail.margin)}. Cardiac stuff.`});
+  if(r.surprise){const g=r.surprise.g;A.push({n:"Surprise of the Week",t:`<b>${tn(g.win)}</b> (seed ${r.seed[g.win]}) took down <b>${tn(g.lose)}</b> (seed ${r.seed[g.lose]}). ${pick(S+4,["Nobody saw that coming.","What was that?","The bracket-busting kind of afternoon."])}`});}
+  if(r.worstDecision&&r.worstDecision.left>3){const d=r.worstDecision;const detail=(d.worst&&d.should)?` Starting <b>${pname(d.worst.pid)}</b> (${fmt(d.worst.pts)}) over <b>${pname(d.should.pid)}</b> (${fmt(d.should.pts)}) on the bench.`:"";A.push({n:"Questionable Decision",t:`<b>${tn(d.key)}</b> left <b>${fmt(d.left)}</b> on the bench.${detail} ${pick(S+5,["Manager of the year material.","Set-and-forget gone wrong.","The bench was the better team."])}`});}
+  if(r.play)A.push({n:"Play of the Week",t:`<b>${pname(r.play.pid)}</b> went nuclear for <b>${fmt(r.play.pts)}</b> (${tn(r.play.key)}).`});
+  if(r.perfect.length)A.push({n:"Perfect Lineup",t:`${r.perfect.map(tn).map(x=>`<b>${x}</b>`).join(", ")} — not a point left on the bench. Chef's kiss.`});
+  const awardsHTML=A.map(a=>`<div class="rv-award"><div class="rv-award-name">${a.n}</div><div class="rv-award-text">${a.t}</div></div>`).join("");
+  // trending
+  const trend=`<div class="rv-trend">
+    <div class="rv-tr up"><span class="rv-tr-h">📈 Trending up</span><b>${tn(r.riser.key)}</b> <span class="muted">(${r.riser.form||"—"}, last 3)</span><div class="muted">${pick(S+6,["Peaking at the right time.","Quietly rounding into a problem.","The arrow is pointing up."])}</div></div>
+    <div class="rv-tr down"><span class="rv-tr-h">📉 Trending down</span><b>${tn(r.faller.key)}</b> <span class="muted">(${r.faller.form||"—"}, last 3)</span><div class="muted">${pick(S+7,["The wheels are wobbling.","Cooling off fast.","Someone check on them."])}</div></div>
+  </div>`;
+  // wire
+  let wire="";
+  if(r.trades.length){
+    wire+=r.trades.map(t=>{
+      const cols=t.sides.map(s=>{const grade=gradeFromNet(s.net);const items=[...s.got.map(pname),...s.picks];return`<div class="rv-tside"><div class="rv-tside-h"><b>${s.key?tn(s.key):"Team"}</b> <span class="grade ${gradeClass(grade)}">${grade}</span></div><div class="muted">Gets: ${items.length?items.join(", "):"—"}</div></div>`;}).join("");
+      return`<div class="rv-trade"><div class="rv-trade-t">Trade</div><div class="rv-tsides">${cols}</div></div>`;
+    }).join("");
+  }else{
+    wire=`<p class="muted">No trades this week. ${pick(S+8,["Cowards, all of you.","The trade block gathers dust.","Somebody make a move."])}</p>`;
+  }
+  if(r.waivers.length&&r.waivers[0].bid>0){const w=r.waivers[0];wire+=`<p class="muted" style="margin-top:10px">Biggest wire move: <b>${tn(w.key)}</b> spent <b>$${w.bid}</b> on <b>${pname(w.pid)}</b>.</p>`;}
+  // next
+  let next="";
+  if(r.nextGame){next=`<div class="rv-award"><div class="rv-award-name">Match-up of the Week (Week ${week+1})</div><div class="rv-award-text"><b>${tn(r.nextGame.a)}</b> vs <b>${tn(r.nextGame.b)}</b>. ${pick(S+9,["The one to circle.","All eyes here.","Appointment viewing."])}</div></div>`;}
+  else if(week===REG_WEEKS){next=`<div class="rv-award"><div class="rv-award-name">That's a wrap</div><div class="rv-award-text">Regular season's done. Playoff time — check the odds tab.</div></div>`;}
+  return `<div class="rv-head"><h2>Week ${week} in Review</h2><span class="muted">Auto-generated from the week's numbers</span></div>
+    <p class="rv-intro">${intro}</p>
+    <h3 class="rv-sec">Weekly awards</h3>
+    <div class="rv-awards">${awardsHTML}</div>
+    <h3 class="rv-sec">Who's heating up, who's not</h3>${trend}
+    <h3 class="rv-sec">On the wire</h3>${wire}
+    <h3 class="rv-sec">Looking ahead</h3>${next}
+    <p class="muted" style="font-size:12px;margin-top:16px">Trade grades are vibes based on projected points. Bench calls compare what was started to the best legal lineup available.</p>`;
+}
+function renderReview(){
+  const stripEl=document.getElementById("reviewStrip");const host=document.getElementById("reviewBody");
+  const fw=finalWeeks();
+  stripEl.innerHTML="";
+  fw.forEach(w=>{const b=document.createElement("button");b.className="wk"+(w===reviewWeek?" active":"")+" done";b.innerHTML=`W${w}<small>review</small>`;b.onclick=()=>{reviewWeek=w;renderReview();};stripEl.appendChild(b);});
+  if(!fw.length){host.innerHTML=`<div class="panel tight"><h3>No week to review yet</h3><p>The commissioner's report drops once Week 1 is in the books. Check back after the first games are final.</p></div>`;return;}
+  if(!fw.includes(reviewWeek))reviewWeek=fw[fw.length-1];
+  const needNames=!Object.keys(state.playerInfo).length&&!state.namesTried;
+  const needTrans=state.transByWeek[reviewWeek]===undefined;
+  if(needNames||needTrans){
+    host.innerHTML=`<div class="skel">Compiling the Week ${reviewWeek} review…</div>`;
+    Promise.resolve()
+      .then(()=>needNames?loadPlayerPositions().catch(()=>{}).finally(()=>{state.namesTried=true;}):null)
+      .then(()=>needTrans?ensureTransWeek(reviewWeek):null)
+      .then(()=>renderReview());
+    return;
+  }
+  host.innerHTML=buildReviewHTML(reviewWeek);
+}
+
 /* ---------- status chrome ---------- */
 function setLive(){
   const dot=document.getElementById("liveDot"),txt=document.getElementById("liveText");
@@ -786,7 +980,7 @@ function showError(){
 }
 function renderAll(){
   activeWeek=Math.min(Math.max(activeWeek,1),REG_WEEKS);
-  renderFixtures();renderStandings();renderPlayoffs();renderDivRosters();setLive();showError();
+  renderFixtures();renderStandings();renderPlayoffs();renderDivRosters();renderReview();setLive();showError();
   document.getElementById("updated").textContent="updated "+new Date().toLocaleString();
 }
 
