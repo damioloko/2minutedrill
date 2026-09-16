@@ -175,6 +175,7 @@
   .lu-player{color:var(--ink);display:flex;flex-direction:column;gap:1px}
   .lu-player .pl-name{font-weight:500}
   .lu-player .pl-meta{color:var(--ink-faint);font-size:11px}
+  .lu-player .pl-stat{color:var(--ink-dim);font-size:11px;margin-top:2px;line-height:1.3}
   .lu-player .pl-empty{color:var(--ink-faint)}
   .lu-pts{text-align:right;font-family:var(--mono-num);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
   .lu-table tfoot td{border-top:1px solid var(--line);font-weight:700;color:var(--ink);font-size:13px}
@@ -333,8 +334,8 @@ const API_COM = "https://api.sleeper.com";
 const state = {
   currentWeek:1, seasonType:"pre", season:"2026",
   rosterByKey:{}, keyByRoster:{}, rosterPlayers:{},
-  weekPoints:{}, matchRaw:{}, projByWeek:{}, playersPos:{}, playerInfo:{}, weekMean:{}, teamBaseline:{},
-  startSlots:[], scoreKey:"pts_ppr", oddsReady:false,
+  weekPoints:{}, matchRaw:{}, projByWeek:{}, statsByWeek:{}, playersPos:{}, playerInfo:{}, weekMean:{}, teamBaseline:{},
+  startSlots:[], scoreKey:"pts_ppr", oddsReady:false, statsFailed:false,
   unresolved:[], projFailed:false, league:null, ready:false
 };
 
@@ -409,7 +410,7 @@ async function loadCore(){
 
 /* ---------- projections support ---------- */
 async function loadPlayerPositions(){
-  if(Object.keys(state.playersPos).length) return;
+  if(Object.keys(state.playerInfo).length) return;
   const need=new Set();
   Object.values(state.rosterPlayers).forEach(arr=>arr.forEach(pid=>need.add(String(pid))));
   // include any starters recorded in matchup data (covers dropped players in past weeks)
@@ -440,6 +441,29 @@ async function ensureProjWeek(w){
     if(!state.playersPos[pid]&&it.player){const fp=it.player.fantasy_positions||(it.player.position?[it.player.position]:[]);if(fp.length)state.playersPos[pid]=fp;}
   });
   state.projByWeek[w]=map;
+}
+/* actual per-player stat lines for a played week */
+async function ensureStatsWeek(w){
+  if(state.statsByWeek[w]) return;
+  const list=await getJSON(`${API_COM}/stats/nfl/${state.season}/${w}?season_type=regular`);
+  const map={};
+  (list||[]).forEach(it=>{const pid=String(it.player_id);map[pid]=it.stats||{};
+    if(!state.playersPos[pid]&&it.player){const fp=it.player.fantasy_positions||(it.player.position?[it.player.position]:[]);if(fp.length)state.playersPos[pid]=fp;}});
+  state.statsByWeek[w]=map;
+}
+/* compact box-score line for a player in a week */
+function statline(pid,week){
+  const s=(state.statsByWeek[week]||{})[String(pid)];if(!s)return "";
+  const info=state.playerInfo[String(pid)];const pos=(info&&info.pos)||(state.playersPos[String(pid)]&&state.playersPos[String(pid)][0])||"";
+  const g=k=>{const v=s[k];return (typeof v==="number")?v:0;};
+  const rnd=n=>Math.round(n);const parts=[];
+  if(g("pass_att")>0) parts.push(`${g("pass_cmp")}/${g("pass_att")}, ${rnd(g("pass_yd"))} pass yd${g("pass_td")?`, ${g("pass_td")} TD`:""}${g("pass_int")?`, ${g("pass_int")} INT`:""}`);
+  if(g("rush_att")>0) parts.push(`${g("rush_att")} car, ${rnd(g("rush_yd"))} yd${g("rush_td")?`, ${g("rush_td")} TD`:""}`);
+  if(g("rec")>0||g("rec_tgt")>0) parts.push(`${g("rec")} rec, ${rnd(g("rec_yd"))} yd${g("rec_td")?`, ${g("rec_td")} TD`:""}`);
+  if(pos==="K"&&(g("fga")>0||g("xpa")>0||g("xpm")>0)) parts.push(`${g("fgm")}/${g("fga")} FG, ${g("xpm")} XP`);
+  if(pos==="DEF"){const d=[];if(g("sack"))d.push(g("sack")+" sk");if(g("int"))d.push(g("int")+" INT");if(g("fum_rec"))d.push(g("fum_rec")+" FR");if(g("def_td"))d.push(g("def_td")+" TD");if(g("safe"))d.push(g("safe")+" saf");d.push(rnd(g("pts_allow"))+" PA");parts.push(d.join(", "));}
+  if(g("fum_lost")>0) parts.push(`${g("fum_lost")} FUM`);
+  return parts.join(" · ");
 }
 /* best legal lineup for a team in a given week -> {rows:[{slot,pid,pts}], total} */
 function optimalLineup(key,week){
@@ -619,7 +643,11 @@ function teamLineupHTML(key,week,mode){
   const t=TEAMS[key];const rows=lineupRows(key,week,mode);
   if(!rows) return `<div class="lu-block"><div class="lu-head"><span class="tdot ${DIV_META[t.div].cls}"></span>${t.name}</div><p class="muted" style="padding:8px 2px;font-size:13px">Lineup unavailable.</p></div>`;
   const total=rows.reduce((s,r)=>s+(r.pts||0),0);
-  const body=rows.map(r=>`<tr><td class="lu-slot">${prettySlot(r.slot)}</td><td class="lu-player">${playerCell(r.pid)}</td><td class="lu-pts">${fmt(r.pts)}</td></tr>`).join("");
+  const body=rows.map(r=>{
+    const sl=(mode==="actual"&&r.pid)?statline(r.pid,week):"";
+    const slHTML=sl?`<span class="pl-stat">${sl}</span>`:"";
+    return `<tr><td class="lu-slot">${prettySlot(r.slot)}</td><td class="lu-player">${playerCell(r.pid)}${slHTML}</td><td class="lu-pts">${fmt(r.pts)}</td></tr>`;
+  }).join("");
   return `<div class="lu-block">
     <div class="lu-head"><span class="tdot ${DIV_META[t.div].cls}"></span>${t.name} <span class="tseed">· ${t.div[0]}${t.ly}</span></div>
     <table class="lu-table"><tbody>${body}</tbody>
@@ -653,11 +681,18 @@ function openMatchup(week,a,b){
     </div>
     ${(!hasActual&&!projReady)?'<p class="muted" style="text-align:center;font-size:13px;padding:8px">Loading projected lineups…</p>':
       `<div class="lu-grid">${teamLineupHTML(a,week,mode)}${teamLineupHTML(b,week,mode)}</div>
-       <p class="muted" style="font-size:12px;margin:14px 2px 0">${hasActual?"Points scored by each starter this week (from Sleeper).":"Highest-scoring legal lineup from projections — not necessarily who's currently slotted."}</p>`}
+       <p class="muted" style="font-size:12px;margin:14px 2px 0">${hasActual?"The starters each team actually played this week, with their real stat lines and points (from Sleeper).":"Projected best possible starters — the highest-scoring legal lineup from projections, not necessarily who's currently slotted."}</p>`}
   `;
   const ov=document.getElementById("overlay");ov.classList.add("show");document.body.style.overflow="hidden";
   if(!hasActual&&!projReady&&Object.keys(state.playersPos).length&&!state.projFailed){
     ensureWeekProjThenRerender(week).then(()=>{if(state.projByWeek[week]&&document.getElementById("overlay").classList.contains("show"))openMatchup(week,a,b);});
+  }
+  if(hasActual&&!state.statsFailed&&(!state.statsByWeek[week]||!Object.keys(state.playerInfo).length)){
+    Promise.resolve()
+      .then(()=>Object.keys(state.playerInfo).length?null:loadPlayerPositions())
+      .then(()=>state.statsByWeek[week]?null:ensureStatsWeek(week))
+      .then(()=>{if(document.getElementById("overlay").classList.contains("show"))openMatchup(week,a,b);})
+      .catch(()=>{state.statsFailed=true;});
   }
 }
 function closeMatchup(){document.getElementById("overlay").classList.remove("show");document.body.style.overflow="";}
@@ -811,7 +846,7 @@ document.getElementById("refreshBtn").onclick=async()=>{
   const b=document.getElementById("refreshBtn");b.textContent="Refreshing…";
   try{await loadCore();
     // refresh projections and re-simulate
-    state.projByWeek={};state.weekMean={};state.teamBaseline={};state.oddsReady=false;
+    state.projByWeek={};state.weekMean={};state.teamBaseline={};state.oddsReady=false;state.statsByWeek={};state.statsFailed=false;
     await loadProjections();
     renderAll();
   }catch(e){}
