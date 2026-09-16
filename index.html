@@ -334,7 +334,7 @@ const API_COM = "https://api.sleeper.com";
 const state = {
   currentWeek:1, seasonType:"pre", season:"2026",
   rosterByKey:{}, keyByRoster:{}, rosterPlayers:{},
-  weekPoints:{}, matchRaw:{}, projByWeek:{}, statsByWeek:{}, playersPos:{}, playerInfo:{}, weekMean:{}, teamBaseline:{},
+  weekPoints:{}, matchRaw:{}, projByWeek:{}, projStatsByWeek:{}, statsByWeek:{}, playersPos:{}, playerInfo:{}, weekMean:{}, teamBaseline:{},
   startSlots:[], scoreKey:"pts_ppr", oddsReady:false, statsFailed:false,
   unresolved:[], projFailed:false, league:null, ready:false
 };
@@ -431,16 +431,16 @@ async function loadPlayerPositions(){
 async function ensureProjWeek(w){
   if(state.projByWeek[w]) return;
   const list=await getJSON(`${API_COM}/projections/nfl/${state.season}/${w}?season_type=regular`);
-  const map={};
+  const map={},smap={};
   (list||[]).forEach(it=>{
     const pid=String(it.player_id);
     const s=it.stats||{};
     let pts=s[state.scoreKey];
     if(typeof pts!=="number") pts=(typeof s.pts_half_ppr==="number")?s.pts_half_ppr:(typeof s.pts_ppr==="number"?s.pts_ppr:(typeof s.pts_std==="number"?s.pts_std:0));
-    map[pid]=pts||0;
+    map[pid]=pts||0; smap[pid]=s;
     if(!state.playersPos[pid]&&it.player){const fp=it.player.fantasy_positions||(it.player.position?[it.player.position]:[]);if(fp.length)state.playersPos[pid]=fp;}
   });
-  state.projByWeek[w]=map;
+  state.projByWeek[w]=map; state.projStatsByWeek[w]=smap;
 }
 /* actual per-player stat lines for a played week */
 async function ensureStatsWeek(w){
@@ -451,20 +451,23 @@ async function ensureStatsWeek(w){
     if(!state.playersPos[pid]&&it.player){const fp=it.player.fantasy_positions||(it.player.position?[it.player.position]:[]);if(fp.length)state.playersPos[pid]=fp;}});
   state.statsByWeek[w]=map;
 }
-/* compact box-score line for a player in a week */
-function statline(pid,week){
-  const s=(state.statsByWeek[week]||{})[String(pid)];if(!s)return "";
-  const info=state.playerInfo[String(pid)];const pos=(info&&info.pos)||(state.playersPos[String(pid)]&&state.playersPos[String(pid)][0])||"";
+/* compact box-score line — actual (proj=false) or projected (proj=true, volume only) */
+function fmtStatline(s,pos,proj){
+  if(!s)return "";
   const g=k=>{const v=s[k];return (typeof v==="number")?v:0;};
   const rnd=n=>Math.round(n);const parts=[];
-  if(g("pass_att")>0) parts.push(`${g("pass_cmp")}/${g("pass_att")}, ${rnd(g("pass_yd"))} pass yd${g("pass_td")?`, ${g("pass_td")} TD`:""}${g("pass_int")?`, ${g("pass_int")} INT`:""}`);
-  if(g("rush_att")>0) parts.push(`${g("rush_att")} car, ${rnd(g("rush_yd"))} yd${g("rush_td")?`, ${g("rush_td")} TD`:""}`);
-  if(g("rec")>0||g("rec_tgt")>0) parts.push(`${g("rec")} rec, ${rnd(g("rec_yd"))} yd${g("rec_td")?`, ${g("rec_td")} TD`:""}`);
-  if(pos==="K"&&(g("fga")>0||g("xpa")>0||g("xpm")>0)) parts.push(`${g("fgm")}/${g("fga")} FG, ${g("xpm")} XP`);
-  if(pos==="DEF"){const d=[];if(g("sack"))d.push(g("sack")+" sk");if(g("int"))d.push(g("int")+" INT");if(g("fum_rec"))d.push(g("fum_rec")+" FR");if(g("def_td"))d.push(g("def_td")+" TD");if(g("safe"))d.push(g("safe")+" saf");d.push(rnd(g("pts_allow"))+" PA");parts.push(d.join(", "));}
-  if(g("fum_lost")>0) parts.push(`${g("fum_lost")} FUM`);
+  const td=v=>proj?"":(v?`, ${v} TD`:"");
+  if(g("pass_att")>0||g("pass_yd")>0) parts.push(`${proj?"":g("pass_cmp")+"/"+g("pass_att")+", "}${rnd(g("pass_yd"))} pass yd${td(g("pass_td"))}${!proj&&g("pass_int")?`, ${g("pass_int")} INT`:""}`);
+  if(g("rush_att")>0||g("rush_yd")>0) parts.push(`${g("rush_att")?rnd(g("rush_att"))+" car, ":""}${rnd(g("rush_yd"))} rush yd${td(g("rush_td"))}`);
+  if(g("rec")>0||g("rec_tgt")>0) parts.push(`${rnd(g("rec"))} rec, ${rnd(g("rec_yd"))} yd${td(g("rec_td"))}`);
+  if(!proj&&pos==="K"&&(g("fga")>0||g("xpa")>0||g("xpm")>0)) parts.push(`${g("fgm")}/${g("fga")} FG, ${g("xpm")} XP`);
+  if(!proj&&pos==="DEF"){const d=[];if(g("sack"))d.push(g("sack")+" sk");if(g("int"))d.push(g("int")+" INT");if(g("fum_rec"))d.push(g("fum_rec")+" FR");if(g("def_td"))d.push(g("def_td")+" TD");if(g("safe"))d.push(g("safe")+" saf");d.push(rnd(g("pts_allow"))+" PA");parts.push(d.join(", "));}
+  if(!proj&&g("fum_lost")>0) parts.push(`${g("fum_lost")} FUM`);
   return parts.join(" · ");
 }
+function posOf(pid){const info=state.playerInfo[String(pid)];return (info&&info.pos)||(state.playersPos[String(pid)]&&state.playersPos[String(pid)][0])||"";}
+function statline(pid,week){return fmtStatline((state.statsByWeek[week]||{})[String(pid)],posOf(pid),false);}
+function projStatline(pid,week){return fmtStatline((state.projStatsByWeek[week]||{})[String(pid)],posOf(pid),true);}
 /* best legal lineup for a team in a given week -> {rows:[{slot,pid,pts}], total} */
 function optimalLineup(key,week){
   const rid=state.rosterByKey[key]; if(rid==null)return null;
@@ -644,7 +647,7 @@ function teamLineupHTML(key,week,mode){
   if(!rows) return `<div class="lu-block"><div class="lu-head"><span class="tdot ${DIV_META[t.div].cls}"></span>${t.name}</div><p class="muted" style="padding:8px 2px;font-size:13px">Lineup unavailable.</p></div>`;
   const total=rows.reduce((s,r)=>s+(r.pts||0),0);
   const body=rows.map(r=>{
-    const sl=(mode==="actual"&&r.pid)?statline(r.pid,week):"";
+    const sl=r.pid?(mode==="actual"?statline(r.pid,week):projStatline(r.pid,week)):"";
     const slHTML=sl?`<span class="pl-stat">${sl}</span>`:"";
     return `<tr><td class="lu-slot">${prettySlot(r.slot)}</td><td class="lu-player">${playerCell(r.pid)}${slHTML}</td><td class="lu-pts">${fmt(r.pts)}</td></tr>`;
   }).join("");
@@ -846,7 +849,7 @@ document.getElementById("refreshBtn").onclick=async()=>{
   const b=document.getElementById("refreshBtn");b.textContent="Refreshing…";
   try{await loadCore();
     // refresh projections and re-simulate
-    state.projByWeek={};state.weekMean={};state.teamBaseline={};state.oddsReady=false;state.statsByWeek={};state.statsFailed=false;
+    state.projByWeek={};state.projStatsByWeek={};state.weekMean={};state.teamBaseline={};state.oddsReady=false;state.statsByWeek={};state.statsFailed=false;
     await loadProjections();
     renderAll();
   }catch(e){}
