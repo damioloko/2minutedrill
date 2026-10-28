@@ -232,6 +232,17 @@
   .lu-table tfoot .grade{white-space:nowrap}
   .tx-src{font-size:12px;margin:14px 2px 0;line-height:1.55}
   .tx-src a,footer a{color:var(--ink-dim)}
+  .pchart{background:var(--surface);border:1px solid var(--line-soft);border-radius:12px;padding:12px 12px 10px;margin-bottom:12px}
+  .pc-head{display:flex;align-items:baseline;gap:8px;margin:0 2px 6px;font-size:14px}
+  .pc-head .muted{font-size:12px}
+  .pchart svg{display:block;width:100%;height:auto}
+  .pc-empty{font-size:13px;margin:8px 2px}
+  .pc-leg{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--ink-faint);margin:6px 2px 0}
+  .pc-leg span{display:inline-flex;align-items:center;gap:6px}
+  .lg-line{width:16px;height:3px;border-radius:2px;background:var(--ink)}
+  .lg-dash{width:16px;border-top:2px dashed var(--ink-faint)}
+  .lg-dot{width:9px;height:9px;border-radius:50%}
+  .lg-dot.mk{background:var(--owen);opacity:.5} .lg-dot.lt{background:var(--gold)}
   @media (max-width:560px){
     .lu-grid{grid-template-columns:1fr}
     .sl-team b{font-size:13.5px} .sl-score{font-size:21px}
@@ -1279,8 +1290,10 @@ function openTransaction(id){
     <div class="sheet-top"><span class="pill">${TX_TYPES[m.type]}</span><span class="status final">${m.leg?`Week ${m.leg} · `:""}${niceDate(m.ts)}</span></div>
     <p class="rv-intro" style="margin-bottom:16px">${txSummary(m)}</p>
     <div class="tx-grid">${m.sides.map(s=>sideBlockHTML(m,s)).join("")}</div>
+    <div id="pcharts"></div>
     <p class="muted tx-src">${txSourceNote(m)}</p>`;
   document.getElementById("overlay").classList.add("show");document.body.style.overflow="hidden";
+  renderPlayerCharts(m);
 }
 function txCoverageBanner(models){
   if(fc.failed)return `<div class="banner">Couldn’t load FantasyCalc values, so moves are listed without grades. Hit refresh to try again.</div>`;
@@ -1322,6 +1335,81 @@ function renderTransactions(){
     c.onclick=()=>openTransaction(c.dataset.tx);
     c.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openTransaction(c.dataset.tx);}};
   });
+}
+/* ---------- per-player value history chart ---------- */
+const fcPlayerFiles={};
+function fcPlayerFile(pid){
+  if(!(pid in fcPlayerFiles))fcPlayerFiles[pid]=getJSON(FC_SNAP_DIR+"players/"+pid+".json").catch(()=>null);
+  return fcPlayerFiles[pid];
+}
+/* implied value paid for a player in this league's two-team trades, priced at the time */
+function leagueTradeDots(pid){
+  const out=[];
+  (tx.models||[]).forEach(m=>{
+    if(m.type!=="trade"||m.sides.length!==2||!m.thenHow)return;
+    m.sides.forEach(s=>{const a=s.ins.find(x=>x.kind==="player"&&x.pid===pid);
+      if(a&&a.then!=null&&s.vThen){const v=s.thenOut-(s.thenIn-a.then);if(v>0)out.push({d:dayStr(m.ts),v,id:m.id,key:s.key});}});
+  });
+  return out;
+}
+function niceStep(max){const raw=max/4;const steps=[250,500,1000,2000,2500,5000,10000];return steps.find(s=>s>=raw)||10000;}
+function chartSVG(pid,m,file,width){
+  const today=dayStr(Date.now());
+  const line=(file&&file.h?file.h.map(([d,v])=>({d,v})):[]);
+  const nowE=fc.now&&fc.now.players[pid];
+  if(nowE&&fc.nowSource==="live"&&(!line.length||line[line.length-1].d<today))line.push({d:today,v:Math.round(nowE.v)});
+  const market=(file&&file.t?file.t.map(([d,v])=>({d,v})):[]);
+  const league=leagueTradeDots(pid);
+  // until real history builds up, anchor the line with an estimate from the 30-day trend
+  let est=null;
+  const span=line.length?(Date.parse(line[line.length-1].d)-Date.parse(line[0].d))/864e5:0;
+  if(nowE&&span<25){const d=dayStr(Date.parse((fc.nowDate||today)+"T12:00:00Z")-FC_TREND_DAYS*864e5);est={d,v:Math.max(0,Math.round(nowE.v-nowE.t))};}
+  const moveD=dayStr(m.ts);
+  const all=[...line,...market,...league,...(est?[est]:[])];
+  if(!all.length)return null;
+  const ds=[...all.map(p=>p.d),moveD,today].map(d=>Date.parse(d));
+  let x0=Math.min(...ds),x1=Math.max(...ds);if(x1-x0<14*864e5)x0=x1-14*864e5;
+  const ymax0=Math.max(...all.map(p=>p.v))*1.12||1000;const step=niceStep(ymax0);const ymax=Math.ceil(ymax0/step)*step;
+  const W=Math.max(280,Math.min(640,Math.round(width||600))),H=Math.round(Math.max(170,Math.min(220,W*0.36))),L=40,R=10,T=12,B=26,pw=W-L-R,ph=H-T-B;
+  const X=d=>L+(Date.parse(d)-x0)/(x1-x0)*pw, Y=v=>T+ph-(v/ymax)*ph;
+  let g="";
+  for(let v=0;v<=ymax;v+=step){g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line-soft)"/><text x="${L-8}" y="${Y(v)+4}" text-anchor="end" font-size="11" fill="var(--ink-faint)">${v>=1000?(v/1000)+"k":v}</text>`;}
+  // month labels
+  const dt=new Date(x0);dt.setUTCDate(1);dt.setUTCMonth(dt.getUTCMonth()+1);const months=[];
+  while(dt.getTime()<=x1){months.push(new Date(dt));dt.setUTCMonth(dt.getUTCMonth()+1);}
+  const every=Math.ceil(months.length/6)||1;
+  months.forEach((md,i)=>{if(i%every)return;const x=L+(md.getTime()-x0)/(x1-x0)*pw;g+=`<line x1="${x}" x2="${x}" y1="${T+ph}" y2="${T+ph+4}" stroke="var(--line)"/><text x="${x}" y="${H-6}" text-anchor="middle" font-size="11" fill="var(--ink-faint)">${md.toLocaleDateString("en-GB",{month:"short",timeZone:"UTC"})}</text>`;});
+  if(!months.length)g+=`<text x="${L}" y="${H-6}" font-size="11" fill="var(--ink-faint)">${niceDate(x0)}</text><text x="${W-R}" y="${H-6}" text-anchor="end" font-size="11" fill="var(--ink-faint)">${niceDate(x1)}</text>`;
+  g+=`<line x1="${L}" x2="${W-R}" y1="${T+ph}" y2="${T+ph}" stroke="var(--line)"/>`;
+  // move marker
+  const mx=X(moveD);g+=`<line x1="${mx}" x2="${mx}" y1="${T}" y2="${T+ph}" stroke="var(--ink-faint)" stroke-dasharray="3 4"/><text x="${mx+66>W-R?mx-5:mx+5}" text-anchor="${mx+66>W-R?"end":"start"}" y="${T+11}" font-size="11" fill="var(--ink-dim)">This move</text>`;
+  // market dots
+  market.forEach(p=>{g+=`<circle cx="${X(p.d)}" cy="${Y(p.v)}" r="4" fill="var(--owen)" fill-opacity=".28"><title>${niceDate(Date.parse(p.d))}: ${num(p.v)} paid in a comparable league</title></circle>`;});
+  // value line
+  if(est&&line.length)g+=`<path d="M${X(est.d)},${Y(est.v)} L${X(line[0].d)},${Y(line[0].v)}" fill="none" stroke="var(--ink-faint)" stroke-width="2" stroke-dasharray="5 5"/>`;
+  if(est)g+=`<circle cx="${X(est.d)}" cy="${Y(est.v)}" r="3.5" fill="var(--bg2)" stroke="var(--ink-faint)" stroke-width="2"><title>Estimated ${num(est.v)} (from 30-day trend)</title></circle>`;
+  if(line.length>1)g+=`<path d="${line.map((p,i)=>(i?"L":"M")+X(p.d)+","+Y(p.v)).join(" ")}" fill="none" stroke="var(--ink)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+  if(line.length)line.slice(-1).forEach(p=>{g+=`<circle cx="${X(p.d)}" cy="${Y(p.v)}" r="4" fill="var(--ink)"><title>${niceDate(Date.parse(p.d))}: ${num(p.v)}</title></circle>`;});
+  // this league's trades
+  league.forEach(p=>{const me=String(p.id)===String(m.id);
+    g+=`<circle cx="${X(p.d)}" cy="${Y(p.v)}" r="${me?7:5}" fill="var(--gold)" stroke="${me?"var(--ink)":"none"}" stroke-width="2"><title>${niceDate(Date.parse(p.d))}: ${esc(txTeam(p.key))} paid ${num(p.v)}${me?" (this trade)":""}</title></circle>`;});
+  const leg=[`<span><i class="lg-line"></i>Value</span>`,
+    est?`<span><i class="lg-dash"></i>Estimate</span>`:"",
+    `<span><i class="lg-dot mk"></i>Comparable leagues (${market.length})</span>`,
+    league.length?`<span><i class="lg-dot lt"></i>Your league (${league.length})</span>`:""].join("");
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(pname(pid))} dynasty value history">${g}</svg><div class="pc-leg">${leg}</div>`;
+}
+async function renderPlayerCharts(m){
+  const host=document.getElementById("pcharts");if(!host)return;
+  const pids=[...new Set(m.sides.flatMap(s=>[...s.ins,...s.outs]).filter(a=>a.kind==="player").map(a=>a.pid))];
+  if(!pids.length){host.remove();return;}
+  host.innerHTML=`<h3 class="rv-sec">Value history</h3>`+pids.map(pid=>`<div class="pchart" id="pc-${esc(pid)}"><div class="pc-head"><b>${esc(pname(pid))}</b><span class="muted">${esc(assetMeta({kind:"player",pid}))}</span></div><p class="muted pc-empty">Loading…</p></div>`).join("");
+  await Promise.all(pids.map(async pid=>{
+    const file=await fcPlayerFile(pid);
+    const el=document.getElementById("pc-"+pid);if(!el||document.getElementById("pcharts")!==host)return;
+    const svg=chartSVG(pid,m,file,(el.clientWidth||600)-24);
+    el.querySelector(".pc-empty").outerHTML=svg?svg:`<p class="muted pc-empty">No FantasyCalc value for this player.</p>`;
+  }));
 }
 /* ===== TX END ===== */
 
