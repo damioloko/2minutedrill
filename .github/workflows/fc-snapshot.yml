@@ -1,4 +1,4 @@
-name: FantasyCalc daily snapshot
+name: Nightly market update
 
 on:
   schedule:
@@ -9,9 +9,14 @@ permissions:
   contents: write
   pages: write
 
+concurrency:
+  group: market-update
+  cancel-in-progress: false
+
 jobs:
-  snapshot:
+  update:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -19,16 +24,36 @@ jobs:
         with:
           node-version: 20
 
+      # crawler state (league list, seen trades) stays private in the Actions cache
+      - name: Restore crawler state
+        uses: actions/cache/restore@v4
+        with:
+          path: .crawl-state
+          key: crawl-state-${{ github.run_id }}
+          restore-keys: crawl-state-
+
       - name: Save today's values
         run: node scripts/fc-snapshot.mjs
 
-      - name: Commit snapshot
+      - name: Collect market trades
+        continue-on-error: true
+        run: node scripts/trades-crawl.mjs
+
+      - name: Save crawler state
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: .crawl-state
+          key: crawl-state-${{ github.run_id }}
+
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add fc
           git diff --cached --quiet && exit 0
-          git commit -m "FantasyCalc snapshot $(date -u +%F)"
+          git commit -m "Market update $(date -u +%F)"
           git push
 
       - name: Rebuild GitHub Pages
