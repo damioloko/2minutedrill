@@ -204,12 +204,40 @@
   .grade.g-b{background:rgba(56,214,230,.16);color:var(--owen)}
   .grade.g-c{background:rgba(246,201,69,.16);color:var(--gold)}
   .grade.g-d{background:rgba(224,82,106,.16);color:var(--loss)}
+  /* transactions */
+  .tx-filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
+  .tx-select{appearance:none;background:var(--surface);border:1px solid var(--line-soft);color:var(--ink);border-radius:10px;padding:8px 30px 8px 12px;font:inherit;font-size:13px;font-weight:600;background-image:linear-gradient(45deg,transparent 50%,var(--ink-faint) 50%),linear-gradient(135deg,var(--ink-faint) 50%,transparent 50%);background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;background-size:5px 5px;background-repeat:no-repeat}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{appearance:none;cursor:pointer;background:var(--surface);border:1px solid var(--line-soft);border-radius:999px;padding:7px 13px;color:var(--ink-dim);font:inherit;font-size:12.5px;font-weight:600}
+  .chip:hover{border-color:var(--line)}
+  .chip.active{background:var(--surface-2);border-color:var(--ink-dim);color:var(--ink)}
+  .tab:focus-visible,.chip:focus-visible,.tx-select:focus-visible,.match.clickable:focus-visible,.refresh:focus-visible{outline:2px solid var(--owen);outline-offset:2px}
+  .tx-list{display:grid;gap:12px}
+  .tx-side{display:flex;gap:12px;align-items:flex-start;padding:12px 16px}
+  .tx-side + .tx-side{border-top:1px solid var(--line-soft)}
+  .tx-main{flex:1;min-width:0}
+  .tx-team{display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px}
+  .tx-move{margin-top:3px;font-size:13px;color:var(--ink-dim);line-height:1.45}
+  .tx-move .sg{font-family:var(--mono-num);font-weight:700;display:inline-block;width:12px}
+  .tx-move .sg.in{color:var(--win)} .tx-move .sg.out{color:var(--loss)}
+  .tx-verdict{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
+  .tx-verdict small{font-size:11px;color:var(--ink-faint);font-weight:600;white-space:nowrap}
+  .grade.g-n{background:rgba(154,166,196,.14);color:var(--ink-dim)}
+  .tx-net{font-family:var(--mono-num);font-variant-numeric:tabular-nums;font-weight:600}
+  .tx-net.up{color:var(--win)} .tx-net.down{color:var(--loss)}
+  .tx-grid{display:grid;gap:14px}
+  .tx-subh td{background:var(--surface-2);color:var(--ink-faint);font-size:11px;font-weight:600;padding:6px 10px}
+  .tx-vals{width:64px}
+  .lu-table tfoot tr + tr td{border-top:none;padding-top:2px}
+  .lu-table tfoot .grade{white-space:nowrap}
+  .tx-src{font-size:12px;margin:14px 2px 0;line-height:1.55}
+  .tx-src a,footer a{color:var(--ink-dim)}
   @media (max-width:560px){
     .lu-grid{grid-template-columns:1fr}
     .sl-team b{font-size:13.5px} .sl-score{font-size:21px}
     .rv-trend,.rv-tsides{grid-template-columns:1fr}
   }
-
+  @media (max-width:560px){
     .table th,.table td{padding:10px 8px;font-size:12.5px}
     .table th.hidesm,.table td.hidesm{display:none}
   }
@@ -231,6 +259,7 @@
     <div class="wrap">
       <button class="tab active" data-view="fixtures">Fixtures</button>
       <button class="tab" data-view="review">Review</button>
+      <button class="tab" data-view="transactions">Transactions</button>
       <button class="tab" data-view="standings">Standings</button>
       <button class="tab" data-view="playoffs">Playoffs</button>
       <button class="tab" data-view="rules">Rules</button>
@@ -251,6 +280,10 @@
       <section class="view" id="view-review">
         <div class="weekbar"><div class="weekstrip" id="reviewStrip"></div></div>
         <div id="reviewBody"><div class="skel">Loading the week…</div></div>
+      </section>
+
+      <section class="view" id="view-transactions">
+        <div id="txBody"><div class="skel">Loading transactions…</div></div>
       </section>
 
       <section class="view" id="view-standings">
@@ -305,7 +338,7 @@
 
   <footer>
     <div class="wrap">
-      <span>Live scores &amp; projections from the Sleeper API · view only · <span id="updated" class="muted">not yet updated</span></span>
+      <span>Live scores &amp; projections from the Sleeper API · trade values from <a href="https://fantasycalc.com" target="_blank" rel="noopener">FantasyCalc.com</a> · <span id="updated" class="muted">not yet updated</span></span>
       <button class="refresh" id="refreshBtn">Refresh</button>
     </div>
   </footer>
@@ -329,7 +362,7 @@ const TEAMS = {
   N2:{name:"Dust Cap Merriment",        div:"Nate", ly:2, overall:3},
   N3:{name:"Injured Reserves",          div:"Nate", ly:3, overall:4},
   N4:{name:"Dillon Panthers",           div:"Nate", ly:4, overall:6},
-  N5:{name:"Third Year Breakout",       div:"Nate", ly:5, overall:9},
+  N5:{name:"Owen Nate's Bagel Shop",    div:"Nate", ly:5, overall:9},
 };
 const DIV_META = { Owen:{cls:"owen"}, Nate:{cls:"nate"} };
 
@@ -424,7 +457,7 @@ async function loadCore(){
   users.forEach(u=>{const tn=(u.metadata&&u.metadata.team_name)?u.metadata.team_name:u.display_name;userById[u.user_id]=tn||u.display_name||("Team "+u.user_id);});
   const rosterNames=rosters.map(r=>{state.rosterPlayers[r.roster_id]=r.players||[];return {roster_id:r.roster_id,name:userById[r.owner_id]||("Roster "+r.roster_id)};});
 
-  const used=new Set();
+  const used=new Set();state.unresolved=[];
   Object.keys(TEAMS).forEach(key=>{
     const target=TEAMS[key].name;
     let hit=rosterNames.find(r=>!used.has(r.roster_id)&&norm(r.name)===norm(target));
@@ -432,6 +465,12 @@ async function loadCore(){
     if(hit){used.add(hit.roster_id);state.rosterByKey[key]=hit.roster_id;state.keyByRoster[hit.roster_id]=key;}
     else state.unresolved.push(target);
   });
+  const leftKeys=Object.keys(TEAMS).filter(k=>state.rosterByKey[k]==null);
+  const leftRosters=rosterNames.filter(r=>!used.has(r.roster_id));
+  if(leftKeys.length===1&&leftRosters.length===1){
+    const k=leftKeys[0],r=leftRosters[0];used.add(r.roster_id);state.rosterByKey[k]=r.roster_id;state.keyByRoster[r.roster_id]=k;
+    state.unresolved=state.unresolved.filter(n=>n!==TEAMS[k].name);
+  }
 
   const upto=Math.min(state.currentWeek,REG_WEEKS);
   const weeks=[];for(let w=1;w<=upto;w++)weeks.push(w);
@@ -441,13 +480,26 @@ async function loadCore(){
 }
 
 /* ---------- projections support ---------- */
+let playersDumpP=null;
+function getPlayersDump(){if(!playersDumpP)playersDumpP=getJSON(API_APP+"/players/nfl").catch(e=>{playersDumpP=null;throw e;});return playersDumpP;}
+async function ensurePlayerInfo(ids){
+  const missing=ids.map(String).filter(id=>!state.playerInfo[id]);if(!missing.length)return;
+  const all=await getPlayersDump();
+  missing.forEach(pid=>{
+    const p=all[pid];
+    if(p){const fp=(p.fantasy_positions&&p.fantasy_positions.length)?p.fantasy_positions:(p.position?[p.position]:[]);
+      if(!state.playersPos[pid])state.playersPos[pid]=fp;
+      state.playerInfo[pid]={name:p.full_name||[p.first_name,p.last_name].filter(Boolean).join(" ")||pid,team:p.team||"",pos:p.position||fp[0]||""};}
+    else if(/^[A-Z]{2,3}$/.test(pid)){state.playersPos[pid]=["DEF"];state.playerInfo[pid]={name:pid+" D/ST",team:pid,pos:"DEF"};}
+  });
+}
 async function loadPlayerPositions(){
   if(Object.keys(state.playerInfo).length) return;
   const need=new Set();
   Object.values(state.rosterPlayers).forEach(arr=>arr.forEach(pid=>need.add(String(pid))));
   // include any starters recorded in matchup data (covers dropped players in past weeks)
   Object.values(state.matchRaw).forEach(wk=>Object.values(wk).forEach(m=>(m.starters||[]).forEach(pid=>{if(pid)need.add(String(pid));})));
-  const all=await getJSON(API_APP+"/players/nfl");
+  const all=await getPlayersDump();
   need.forEach(pid=>{
     const p=all[pid];
     if(p){
@@ -966,6 +1018,313 @@ function renderReview(){
   host.innerHTML=buildReviewHTML(reviewWeek);
 }
 
+/* ===== TX START: transactions + FantasyCalc market values ===== */
+const FC_API="https://api.fantasycalc.com/values/current";
+const FC_SNAP_DIR="fc/";          // daily snapshots committed by the GitHub Action
+const FC_FLOOR=300;               // below this on both sides, a move is "low stakes"
+const FC_SNAP_WINDOW=3;           // days either side of a move to accept a snapshot
+const FC_TREND_DAYS=30;
+const fc={now:null,nowSource:null,nowDate:null,index:null,indexP:null,snaps:{},failed:false};
+const tx={models:null};
+let txLoad=null;
+const txUI={team:"all",type:"all"};
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function num(n){return n==null?"—":Math.round(n).toLocaleString("en-GB");}
+function signed(n){return n==null?"—":(n>0?"+":n<0?"−":"")+Math.abs(Math.round(n)).toLocaleString("en-GB");}
+function dayStr(ts){return new Date(ts).toISOString().slice(0,10);}
+function niceDate(ts){return new Date(ts).toLocaleDateString("en-GB",{day:"numeric",month:"short"});}
+
+function fcParams(){
+  const lg=state.league||{};const rp=lg.roster_positions||[];
+  const numQbs=(rp.includes("SUPER_FLEX")||rp.filter(p=>p==="QB").length>=2)?2:1;
+  const rec=(lg.scoring_settings&&typeof lg.scoring_settings.rec==="number")?lg.scoring_settings.rec:1;
+  return {isDynasty:true,numQbs,numTeams:lg.total_rosters||10,ppr:rec>=1?1:(rec>0?0.5:0)};
+}
+/* pick names vary ("2027 1st", "2027 Mid 1st", "2026 Pick 1.05") -> one value per season+round */
+function normPicks(raw){
+  const gen={},spec={};
+  Object.keys(raw||{}).forEach(name=>{
+    const e=raw[name];const v=+e[0]||0,t=+e[1]||0;
+    const ys=name.match(/(20\d{2})/);if(!ys)return;
+    let round=null,generic=false,m;
+    if((m=name.match(/\b(\d)\.\d{1,2}\b/)))round=+m[1];
+    else if((m=name.match(/\b(\d)(?:st|nd|rd|th)\b/i))){round=+m[1];generic=!/early|mid|late/i.test(name);}
+    else if((m=name.match(/round\s*(\d)/i))){round=+m[1];generic=true;}
+    if(!round)return;
+    const k=ys[1]+"-"+round,b=generic?gen:spec;(b[k]=b[k]||[]).push([v,t]);
+  });
+  const out={};
+  new Set([...Object.keys(gen),...Object.keys(spec)]).forEach(k=>{
+    const arr=gen[k]||spec[k];
+    out[k]={v:arr.reduce((s,x)=>s+x[0],0)/arr.length,t:arr.reduce((s,x)=>s+x[1],0)/arr.length};
+  });
+  return out;
+}
+function fcBuild(players,picks){
+  const p={};Object.keys(players||{}).forEach(id=>{const e=players[id];p[String(id)]={v:+e[0]||0,t:+e[1]||0};});
+  return {players:p,picks:normPicks(picks)};
+}
+function fcLoadIndex(){
+  if(!fc.indexP)fc.indexP=getJSON(FC_SNAP_DIR+"index.json")
+    .then(j=>{fc.index=(j&&Array.isArray(j.dates))?j.dates.slice().sort():[];})
+    .catch(()=>{fc.index=[];});
+  return fc.indexP;
+}
+async function fcLoadSnap(d){
+  if(d in fc.snaps)return fc.snaps[d];
+  try{const j=await getJSON(FC_SNAP_DIR+d+".json");fc.snaps[d]=fcBuild(j.players,j.picks);}
+  catch(e){fc.snaps[d]=null;}
+  return fc.snaps[d];
+}
+async function fcLoadNow(){
+  if(fc.now)return;
+  const p=fcParams();
+  try{
+    const rows=await getJSON(`${FC_API}?isDynasty=true&numQbs=${p.numQbs}&numTeams=${p.numTeams}&ppr=${p.ppr}`);
+    if(!Array.isArray(rows)||!rows.length)throw new Error("no values");
+    const players={},picks={};
+    rows.forEach(r=>{const pl=r.player||{};const e=[+r.value||0,+r.trend30Day||0];
+      if(pl.position==="PICK")picks[pl.name]=e;else if(pl.sleeperId)players[String(pl.sleeperId)]=e;});
+    fc.now=fcBuild(players,picks);fc.nowSource="live";fc.nowDate=dayStr(Date.now());
+  }catch(e){
+    // browser blocked or API down: fall back to the newest committed snapshot
+    await fcLoadIndex();
+    const last=fc.index.length?fc.index[fc.index.length-1]:null;
+    const s=last?await fcLoadSnap(last):null;
+    if(s){fc.now=s;fc.nowSource="snapshot";fc.nowDate=last;}else fc.failed=true;
+  }
+}
+/* nearest snapshot to a move: latest on/before within the window, else earliest after */
+function fcSnapFor(ts){
+  const idx=fc.index||[];if(!idx.length)return null;
+  const t0=Date.parse(dayStr(ts));let before=null,after=null;
+  idx.forEach(d=>{const diff=(Date.parse(d)-t0)/864e5;
+    if(diff<=0&&diff>=-FC_SNAP_WINDOW){if(before==null||d>before)before=d;}
+    else if(diff>0&&diff<=FC_SNAP_WINDOW){if(after==null||d<after)after=d;}});
+  return before||after;
+}
+
+function txnModel(t){
+  const type=t.type==="trade"?"trade":t.type==="waiver"?"waiver":t.type==="free_agent"?"fa":"comm";
+  const rids=(t.roster_ids&&t.roster_ids.length)?t.roster_ids.slice():[...new Set([...Object.values(t.adds||{}),...Object.values(t.drops||{})])];
+  const sides=rids.map(rid=>{
+    const ins=[],outs=[];
+    Object.keys(t.adds||{}).forEach(pid=>{if(t.adds[pid]===rid)ins.push({kind:"player",pid:String(pid)});});
+    Object.keys(t.drops||{}).forEach(pid=>{if(t.drops[pid]===rid)outs.push({kind:"player",pid:String(pid)});});
+    (t.draft_picks||[]).forEach(dp=>{
+      const mk=()=>({kind:"pick",season:String(dp.season),round:dp.round,orig:dp.roster_id});
+      if(dp.owner_id===rid)ins.push(mk());
+      if(dp.previous_owner_id===rid)outs.push(mk());
+    });
+    const wb=t.waiver_budget||[];
+    return {rid,key:state.keyByRoster[rid],ins,outs,
+      faabIn:wb.filter(b=>b.receiver===rid).reduce((s,b)=>s+(b.amount||0),0),
+      faabOut:wb.filter(b=>b.sender===rid).reduce((s,b)=>s+(b.amount||0),0)};
+  }).filter(s=>s.ins.length||s.outs.length||s.faabIn||s.faabOut);
+  return {id:t.transaction_id,type,ts:t.status_updated||t.created||0,leg:t.leg,sides,
+    bid:(t.settings&&typeof t.settings.waiver_bid==="number")?t.settings.waiver_bid:null};
+}
+function assetEntry(a,snap){
+  if(!snap)return null;
+  return a.kind==="player"?(snap.players[a.pid]||null):(snap.picks[a.season+"-"+a.round]||null);
+}
+/* players FantasyCalc doesn't list are worth 0; unpriced picks stay unknown */
+function assetVal(a,snap){const e=assetEntry(a,snap);return e?Math.round(e.v):(a.kind==="player"?0:null);}
+function verdict(inV,outV,sk){
+  if(inV==null||outV==null)return null;
+  const delta=inV-outV;
+  if(sk==="add")return inV>=FC_FLOOR?{label:"Free value",cls:"g-a",delta}:{label:"Depth add",cls:"g-n",delta};
+  if(sk==="drop")return outV>=FC_FLOOR?{label:"Value cut",cls:"g-d",delta}:{label:"Roster trim",cls:"g-n",delta};
+  const big=Math.max(inV,outV);
+  if(big<FC_FLOOR)return {label:"Low stakes",cls:"g-n",delta,pct:0};
+  const pct=delta/big;
+  const b=pct>=.35?["Robbery","g-a"]:pct>=.15?["Underpaid","g-a"]:pct>=.05?["Slight edge","g-b"]:
+          pct>-.05?["Fair","g-n"]:pct>-.15?["Slight overpay","g-c"]:pct>-.35?["Overpaid","g-d"]:["Fleeced","g-d"];
+  return {label:b[0],cls:b[1],delta,pct};
+}
+function valueTxn(m){
+  const snap=m.snap?fc.snaps[m.snap]:null;
+  const age=fc.nowDate?Math.max(0,(Date.parse(fc.nowDate+"T12:00:00Z")-m.ts)/864e5):Infinity;
+  m.thenHow=snap?"snap":(fc.now&&age<=FC_TREND_DAYS?"approx":null);
+  const valThen=a=>{
+    if(m.thenHow==="snap")return assetVal(a,snap);
+    if(m.thenHow==="approx"){const e=assetEntry(a,fc.now);if(!e)return a.kind==="player"?0:null;return Math.max(0,Math.round(e.v-e.t*age/FC_TREND_DAYS));}
+    return null;
+  };
+  const sum=(arr,k)=>arr.reduce((x,a)=>x+(a[k]||0),0);
+  m.sides.forEach(s=>{
+    s.sk=m.type==="trade"?"trade":(s.ins.length&&s.outs.length)?"swap":s.ins.length?"add":"drop";
+    [...s.ins,...s.outs].forEach(a=>{a.then=valThen(a);a.now=fc.now?assetVal(a,fc.now):null;});
+    if(m.thenHow){s.thenIn=sum(s.ins,"then");s.thenOut=sum(s.outs,"then");s.vThen=verdict(s.thenIn,s.thenOut,s.sk);}
+    if(fc.now){s.nowIn=sum(s.ins,"now");s.nowOut=sum(s.outs,"now");s.vNow=verdict(s.nowIn,s.nowOut,s.sk);}
+  });
+  return m;
+}
+/* net market value each manager has gained or given up across all their moves */
+function managerTable(models){
+  const t={};Object.keys(TEAMS).forEach(k=>t[k]={key:k,moves:0,then:0,thenN:0,now:0});
+  models.forEach(m=>m.sides.forEach(s=>{if(!s.key||!t[s.key])return;const r=t[s.key];r.moves++;
+    if(s.vThen){r.then+=s.vThen.delta;r.thenN++;}if(s.vNow)r.now+=s.vNow.delta;}));
+  return Object.values(t).sort((a,b)=>(b.now-a.now)||(b.then-a.then));
+}
+
+function loadTransactionsData(){
+  if(txLoad)return txLoad;
+  txLoad=(async()=>{
+    const top=Math.max(1,Math.min(state.currentWeek,18));
+    const ws=[];for(let w=0;w<=top;w++)ws.push(w);
+    await Promise.all(ws.map(w=>ensureTransWeek(w)));
+    const seen=new Set(),all=[];
+    ws.forEach(w=>(state.transByWeek[w]||[]).forEach(t=>{
+      if(t.status!=="complete"||seen.has(t.transaction_id))return;seen.add(t.transaction_id);all.push(t);}));
+    const ids=new Set();all.forEach(t=>{Object.keys(t.adds||{}).forEach(p=>ids.add(p));Object.keys(t.drops||{}).forEach(p=>ids.add(p));});
+    await Promise.all([ensurePlayerInfo([...ids]).catch(()=>{}),fcLoadNow(),fcLoadIndex()]);
+    const models=all.map(txnModel).filter(m=>m.sides.length);
+    const need=new Set();models.forEach(m=>{m.snap=fcSnapFor(m.ts);if(m.snap)need.add(m.snap);});
+    await Promise.all([...need].map(fcLoadSnap));
+    models.forEach(valueTxn);
+    models.sort((a,b)=>b.ts-a.ts);
+    tx.models=models;
+  })().catch(e=>{txLoad=null;throw e;});
+  return txLoad;
+}
+
+/* ---------- transactions rendering ---------- */
+const TX_TYPES={trade:"Trade",waiver:"Waiver claim",fa:"Free agent",comm:"Commissioner"};
+function txTeam(key){return key?TEAMS[key].name:"Unmatched team";}
+function txDot(key){return key?`<span class="tdot ${DIV_META[TEAMS[key].div].cls}"></span>`:"";}
+function assetName(a){
+  if(a.kind==="pick"){const ok=state.keyByRoster[a.orig];return `${a.season} round ${a.round}${ok?` (${esc(TEAMS[ok].name)})`:""}`;}
+  return esc(pname(a.pid));
+}
+function assetMeta(a){
+  if(a.kind==="pick")return "Draft pick";
+  const i=state.playerInfo[a.pid];return i?[i.pos,i.team].filter(Boolean).join(" · "):"";
+}
+function thenLabel(m){return m.thenHow==="snap"?"At the time":m.thenHow==="approx"?"At the time (est.)":"";}
+function verdictBlock(m,s){
+  const main=s.vThen||s.vNow;if(!main)return "";
+  const sub=s.vThen?(s.vNow?`Now: ${s.vNow.label}`:thenLabel(m)):"Hindsight";
+  return `<div class="tx-verdict"><span class="grade ${main.cls}">${main.label}</span><small>${sub}</small></div>`;
+}
+function moveLine(s){
+  const parts=[];
+  if(s.ins.length)parts.push(`<div><span class="sg in">+</span>${s.ins.map(assetName).join(", ")}</div>`);
+  if(s.outs.length)parts.push(`<div><span class="sg out">−</span>${s.outs.map(assetName).join(", ")}</div>`);
+  if(s.faabIn)parts.push(`<div><span class="sg in">+</span>$${s.faabIn} FAAB</div>`);
+  if(s.faabOut)parts.push(`<div><span class="sg out">−</span>$${s.faabOut} FAAB</div>`);
+  return parts.join("");
+}
+function txCardHTML(m){
+  const sides=m.sides.map(s=>`<div class="tx-side">
+      <div class="tx-main"><div class="tx-team">${txDot(s.key)}${esc(txTeam(s.key))}</div><div class="tx-move">${moveLine(s)}</div></div>
+      ${verdictBlock(m,s)}
+    </div>`).join("");
+  const bid=(m.type==="waiver"&&m.bid)?` · $${m.bid} bid`:"";
+  return `<div class="match clickable" tabindex="0" role="button" data-tx="${esc(m.id)}">
+    <div class="badge-row"><span class="gtype"><span class="pill">${TX_TYPES[m.type]}</span></span><span>${m.leg?`Week ${m.leg} · `:""}${niceDate(m.ts)}${bid}</span></div>
+    ${sides}
+    <div class="tapcue">View breakdown ›</div>
+  </div>`;
+}
+function txSummary(m){
+  const tn=k=>`<b>${esc(txTeam(k))}</b>`;
+  const lead=(v,which)=>{
+    if(m.sides.length!==2||!m.sides[0][v])return "";
+    const a=m.sides[0],b=m.sides[1],d=a[v].delta;
+    if(a[v].label==="Fair"||a[v].label==="Low stakes")return `${which}, it’s close to even.`;
+    const w=d>0?a:b;return `${which}, ${tn(w.key)} came out <b>${num(Math.abs(d))}</b> ahead.`;
+  };
+  if(m.type==="trade"){
+    const t=lead("vThen",m.thenHow==="approx"?"At the time (estimated)":"At the time"),n=lead("vNow","On today’s values");
+    return [t,n].filter(Boolean).join(" ")||"Not enough market data to grade this one.";
+  }
+  const s=m.sides[0];const bits=[];
+  if(s.vThen)bits.push(`${thenLabel(m)}: <b>${num(s.thenIn)}</b> in, <b>${num(s.thenOut)}</b> out.`);
+  if(s.vNow)bits.push(`Today: <b>${num(s.nowIn)}</b> in, <b>${num(s.nowOut)}</b> out.`);
+  if(m.bid)bits.push(`Cost <b>$${m.bid}</b> of FAAB.`);
+  return `${tn(s.key)} ${s.sk==="drop"?"cut":"picked up"} ${s.sk==="drop"?s.outs.map(assetName).join(", "):s.ins.map(assetName).join(", ")}${s.sk==="swap"?` for ${s.outs.map(assetName).join(", ")}`:""}. `+bits.join(" ");
+}
+function valueRows(arr,label){
+  if(!arr.length)return "";
+  return `<tr class="tx-subh"><td colspan="3">${label}</td></tr>`+arr.map(a=>`<tr>
+    <td class="lu-player"><span class="pl-name">${assetName(a)}</span><span class="pl-meta">${esc(assetMeta(a))}</span></td>
+    <td class="lu-pts tx-vals">${num(a.then)}</td><td class="lu-pts tx-vals">${num(a.now)}</td></tr>`).join("");
+}
+function sideBlockHTML(m,s){
+  const net=v=>v==null?"—":`<span class="tx-net ${v>0?"up":v<0?"down":""}">${signed(v)}</span>`;
+  const chip=v=>v?`<span class="grade ${v.cls}">${v.label}</span>`:"—";
+  const faab=(s.faabIn||s.faabOut)?`<tr class="tx-subh"><td colspan="3">FAAB ${s.faabIn?`+$${s.faabIn}`:`−$${s.faabOut}`} (not priced)</td></tr>`:"";
+  return `<div class="lu-block">
+    <div class="lu-head">${txDot(s.key)}${esc(txTeam(s.key))}</div>
+    <table class="lu-table">
+      <thead><tr class="tx-subh"><td></td><td class="lu-pts tx-vals">${m.thenHow==="approx"?"Then*":"Then"}</td><td class="lu-pts tx-vals">Now</td></tr></thead>
+      <tbody>${valueRows(s.ins,s.sk==="trade"?"Gets":"Added")}${valueRows(s.outs,s.sk==="trade"?"Gives":"Dropped")}${faab}</tbody>
+      <tfoot><tr><td class="lu-player">Net value</td><td class="lu-pts">${net(s.vThen?s.vThen.delta:null)}</td><td class="lu-pts">${net(s.vNow?s.vNow.delta:null)}</td></tr>
+        <tr><td class="lu-player">Verdict</td><td class="lu-pts">${chip(s.vThen)}</td><td class="lu-pts">${chip(s.vNow)}</td></tr></tfoot>
+    </table></div>`;
+}
+function txSourceNote(m){
+  const how=m.thenHow==="snap"?`“Then” uses the FantasyCalc snapshot from ${niceDate(Date.parse(m.snap))}.`
+    :m.thenHow==="approx"?"*No snapshot from that date, so “then” is estimated from FantasyCalc’s 30-day trend."
+    :"No market data from that date, so this move is graded on today’s values only.";
+  const now=fc.nowSource==="live"?"“Now” is FantasyCalc’s live value.":fc.nowSource==="snapshot"?`“Now” is the latest snapshot (${niceDate(Date.parse(fc.nowDate))}).`:"";
+  const p=fcParams();
+  return `${how} ${now} Dynasty, ${p.numQbs===2?"superflex":"1QB"}, ${p.numTeams} teams, ${p.ppr} PPR. Multi-player sides are summed straight, with no consolidation premium for the best asset. Values from <a href="https://fantasycalc.com" target="_blank" rel="noopener">FantasyCalc.com</a>.`;
+}
+function openTransaction(id){
+  const m=(tx.models||[]).find(x=>String(x.id)===String(id));if(!m)return;
+  document.getElementById("sheetBody").innerHTML=`
+    <div class="sheet-top"><span class="pill">${TX_TYPES[m.type]}</span><span class="status final">${m.leg?`Week ${m.leg} · `:""}${niceDate(m.ts)}</span></div>
+    <p class="rv-intro" style="margin-bottom:16px">${txSummary(m)}</p>
+    <div class="tx-grid">${m.sides.map(s=>sideBlockHTML(m,s)).join("")}</div>
+    <p class="muted tx-src">${txSourceNote(m)}</p>`;
+  document.getElementById("overlay").classList.add("show");document.body.style.overflow="hidden";
+}
+function txCoverageBanner(models){
+  if(fc.failed)return `<div class="banner">Couldn’t load FantasyCalc values, so moves are listed without grades. Hit refresh to try again.</div>`;
+  const noThen=models.filter(m=>!m.thenHow).length,est=models.filter(m=>m.thenHow==="approx").length;
+  if(!fc.index.length)return `<div class="banner info">Market history starts with the first daily snapshot. Until then, moves from the last 30 days are graded on an estimate from FantasyCalc’s 30-day trend${noThen?`, and ${noThen} older move${noThen>1?"s are":" is"} graded on today’s values only`:""}.</div>`;
+  if(noThen||est)return `<p class="muted" style="font-size:12.5px;margin:0 2px 14px">${noThen?`${noThen} move${noThen>1?"s":""} predate the snapshot history and are graded on today’s values. `:""}${est?`${est} use an estimated “then” value.`:""}</p>`;
+  return "";
+}
+function renderTransactions(){
+  const host=document.getElementById("txBody");
+  if(!state.ready){host.innerHTML=`<div class="skel">Waiting for Sleeper…</div>`;return;}
+  if(!tx.models){
+    host.innerHTML=`<div class="skel">Pulling every move and pricing it…</div>`;
+    loadTransactionsData().then(renderTransactions).catch(()=>{host.innerHTML=`<div class="banner"><b>Couldn’t load transactions from Sleeper.</b> Hit refresh to try again.</div>`;});
+    return;
+  }
+  const models=tx.models;
+  if(!models.length){host.innerHTML=`<div class="panel tight"><h3>No moves yet</h3><p>Trades, waiver claims and free-agent pickups appear here once they process in Sleeper.</p></div>`;return;}
+  const mt=managerTable(models);
+  const rows=mt.map((r,i)=>`<tr><td class="rk">${i+1}</td><td class="team">${esc(TEAMS[r.key].name)}</td><td class="num hidesm">${r.moves}</td>
+      <td class="num hidesm">${r.thenN?`<span class="tx-net ${r.then>0?"up":r.then<0?"down":""}">${signed(r.then)}</span>`:"—"}</td>
+      <td class="num">${fc.now?`<span class="tx-net ${r.now>0?"up":r.now<0?"down":""}">${signed(r.now)}</span>`:"—"}</td></tr>`).join("");
+  const teamOpts=`<option value="all">All teams</option>`+Object.keys(TEAMS).sort((a,b)=>TEAMS[a].name.localeCompare(TEAMS[b].name))
+    .map(k=>`<option value="${k}" ${txUI.team===k?"selected":""}>${esc(TEAMS[k].name)}</option>`).join("");
+  const typeChips=[["all","All"],["trade","Trades"],["waiver","Waivers"],["fa","Free agents"]]
+    .map(([v,l])=>`<button class="chip ${txUI.type===v?"active":""}" data-txtype="${v}">${l}</button>`).join("");
+  const shown=models.filter(m=>(txUI.type==="all"||m.type===txUI.type)&&(txUI.team==="all"||m.sides.some(s=>s.key===txUI.team)));
+  let list="",lastLeg=null;
+  shown.forEach(m=>{const lg=m.leg||0;if(lg!==lastLeg){list+=`<h3 class="rv-sec">${lg?`Week ${lg}`:"Offseason"}</h3>`;lastLeg=lg;}list+=txCardHTML(m);});
+  host.innerHTML=`${txCoverageBanner(models)}
+    ${fc.now?`<div class="panel tight"><h3>Market value won and lost</h3>
+      <p>Net FantasyCalc value each manager has gained across every trade, claim and drop. “Then” sums each move at the time it happened; “now” re-prices every move on today’s values.</p>
+      <table class="table"><thead><tr><th>#</th><th class="team">Team</th><th class="hidesm">Moves</th><th class="hidesm">Then</th><th>Now</th></tr></thead><tbody>${rows}</tbody></table></div>`:""}
+    <div class="tx-filters"><select class="tx-select" id="txTeam" aria-label="Filter by team">${teamOpts}</select><div class="chips">${typeChips}</div></div>
+    <div class="tx-list">${list||`<p class="muted">No moves match those filters.</p>`}</div>`;
+  document.getElementById("txTeam").onchange=e=>{txUI.team=e.target.value;renderTransactions();};
+  host.querySelectorAll("[data-txtype]").forEach(b=>b.onclick=()=>{txUI.type=b.dataset.txtype;renderTransactions();});
+  host.querySelectorAll("[data-tx]").forEach(c=>{
+    c.onclick=()=>openTransaction(c.dataset.tx);
+    c.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openTransaction(c.dataset.tx);}};
+  });
+}
+/* ===== TX END ===== */
+
 /* ---------- status chrome ---------- */
 function setLive(){
   const dot=document.getElementById("liveDot"),txt=document.getElementById("liveText");
@@ -981,6 +1340,7 @@ function showError(){
 function renderAll(){
   activeWeek=Math.min(Math.max(activeWeek,1),REG_WEEKS);
   renderFixtures();renderStandings();renderPlayoffs();renderDivRosters();renderReview();setLive();showError();
+  if(document.getElementById("view-transactions").classList.contains("active"))renderTransactions();
   document.getElementById("updated").textContent="updated "+new Date().toLocaleString();
 }
 
@@ -1038,10 +1398,12 @@ document.querySelectorAll(".tab").forEach(btn=>{btn.onclick=()=>{
   document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));
   document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
   btn.classList.add("active");document.getElementById("view-"+btn.dataset.view).classList.add("active");
+  if(btn.dataset.view==="transactions")renderTransactions();
 };});
 document.getElementById("refreshBtn").onclick=async()=>{
   const b=document.getElementById("refreshBtn");b.textContent="Refreshing…";
   try{await loadCore();
+    state.transByWeek={};txLoad=null;tx.models=null;
     // refresh projections and re-simulate
     state.projByWeek={};state.projStatsByWeek={};state.weekMean={};state.teamBaseline={};state.oddsReady=false;state.statsByWeek={};state.statsFailed=false;
     await loadProjections();
