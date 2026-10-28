@@ -1,0 +1,38 @@
+name: FantasyCalc daily snapshot
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # 06:17 UTC every day
+  workflow_dispatch:        # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Save today's values
+        run: node scripts/fc-snapshot.mjs
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fc
+          git diff --cached --quiet && exit 0
+          git commit -m "FantasyCalc snapshot $(date -u +%F)"
+          git push
+
+      - name: Rebuild GitHub Pages
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/pages/builds"
